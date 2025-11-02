@@ -51,6 +51,7 @@ jobs:
             any::xts
             any::zoo
             any::TTR
+            any::svglite
           cache-version: 1
 
       - name: Render R Markdown (single file)
