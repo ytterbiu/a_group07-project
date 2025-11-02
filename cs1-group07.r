@@ -12,7 +12,7 @@
 # Date:         TBC
 # Description:  TBC
 # Dependencies:
-#   - TBC
+#   - quantmod
 #
 # ==============================================================================
 
@@ -23,7 +23,7 @@ cat("\014") # Clean console
 
 # Set working directory (Modify accordingly)
 setwd(
-  "/Users/eddy/Documents/Actuary MSc/m_SMM047 Probability and Mathematical Statistics (Subject CS1)/juypter_notebooks"
+  "/Users/eddy/Documents/Actuary MSc/m_SMM047 Probability and Mathematical Statistics (Subject CS1)/a_group07-project"
 )
 
 
@@ -32,7 +32,7 @@ setwd(
 library(quantmod)
 
 # Download the data
-getSymbols("^MERV", from = "2018-01-01", to = "2024-12-31")
+getSymbols("^IXIC", from = "2018-01-01", to = "2024-12-31")
 
 MERV_Adj <- na.omit(Ad(MERV))
 plot(MERV_Adj)
