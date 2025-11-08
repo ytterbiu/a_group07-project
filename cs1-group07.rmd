@@ -77,6 +77,7 @@ if (knitr::is_latex_output()) {
     fig.height = 4,
     dev        = "pdf"
   )
+  knitr::opts_chunk$set(fig.pos = "ht", out.extra = "")
 } else {
   # For HTML (or other)
   knitr::opts_chunk$set(
@@ -100,13 +101,16 @@ cat("\014") # Clean console
 ```{r, include=FALSE, echo=FALSE}
 ## dependencies / external librarys
 library(quantmod)
+library(xts) #downloading
+library(zoo) #downloading
+
 library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(patchwork)
-library(e1071)
 library(kableExtra)
 
+library(e1071)
 library(summarytools)
 library(nortest) #normality test
 ```
@@ -114,9 +118,80 @@ library(nortest) #normality test
 The Nasdaq Composite (`^IXIC`) data was downloaded using the `getSymbols`
 command from the `quantmod` library.
 
+<!-- Old implementation (updated 08/11/2025 to works offline): -->
+<!-- # ```{r Download data, include=FALSE} -->
+<!-- # # Download the data -->
+<!-- # getSymbols("^IXIC", from = "2018-01-01", to = "2024-12-31") -->
+<!-- # ``` -->
+
 ```{r Download data, include=FALSE}
+# Define inputs & date range
+ticker <- "^IXIC"
+from   <- as.Date("2018-01-01")
+to     <- as.Date("2024-12-31")
+
+# Clean ticker for filename (remove ^ and any non-alphanumerics)
+ticker_clean <- gsub("[^A-Za-z0-9]", "", ticker)
+
+# Create filename (IXIC20180101to20241231.csv)
+fname <- sprintf(
+  "%s%sto%s.csv",
+  ticker_clean,
+  format(from, "%Y%m%d"),
+  format(to,   "%Y%m%d")
+)
+
+
+load_from_csv <- function(path) {
+  dat <- read.csv(path, stringsAsFactors = FALSE)
+
+  # req date -> if missing force error & re-download
+  if (!"Date" %in% names(dat)) {
+    stop("CSV does not have expected 'Date' column.")
+  }
+
+  xts::xts(
+    dat[ , setdiff(names(dat), "Date"), drop = FALSE],
+    order.by = as.Date(dat$Date)
+  )
+}
+
+download_ixic <- function(ticker, from, to) {
+  getSymbols(
+    ticker,
+    from        = from,
+    to          = to,
+    auto.assign = FALSE
+  )
+}
+
+use_download <- FALSE
+
+if (file.exists(fname)) {
+  IXIC <- tryCatch(
+    load_from_csv(fname),
+    error = function(e) {
+      message("Cached file invalid, downloading fresh data: ", e$message)
+      use_download <<- TRUE
+      download_ixic(ticker, from, to)
+    }
+  )
+} else {
+  use_download <- TRUE
+  IXIC <- download_ixic(ticker, from, to)
+}
+
+# If downloaded, rewrite a clean CSV cache
+if (use_download) {
+  ixic_df <- data.frame(
+    Date = index(IXIC),
+    coredata(IXIC)
+  )
+  write.csv(ixic_df, fname, row.names = FALSE)
+}
+
 # Download the data
-getSymbols("^IXIC", from = "2018-01-01", to = "2024-12-31")
+# getSymbols("^IXIC", from = "2018-01-01", to = "2024-12-31")
 ```
 
 First we can prepare our data, getting the adjusted close price, applying a log
@@ -174,7 +249,7 @@ p2 <- ggplot(df, aes(date, z_n)) +
 
 # Individual elements
 
-## Data cleaning and standard test of normality
+## Data cleaning and standard test of normality {#elementOne}
 
 ### Identifying and removing outliers
 
@@ -302,7 +377,6 @@ kable(
   kable_styling(full_width = FALSE, position = "center")
 ```
 
-
 BE note: I have included a quick demo of this here:
 
 ```{r Element 1 pt3, echo=FALSE}
@@ -417,26 +491,26 @@ normally distributed. The test yields a statistic of A =
 reject $H_0$ in favour of $H_1$. The Anderson-Darling test provides strong
 evidence that the $z_n$ data are not normally distributed.
 
-## Investigation of normality by resampling
+## Investigation of normality by resampling {#elementTwo}
 
 ### Instructions (to be removed later)
 
-You are going to investigate whether the difference between your sample and a
+_You are going to investigate whether the difference between your sample and a
 sample from a normal distribution becomes apparent when constructing confidence
-intervals for sample skewness.
+intervals for sample skewness._
 
-(a) Simulate a sample of size 13 from a Normal distribution with mean and
+_(a) Simulate a sample of size 13 from a Normal distribution with mean and
 variance equal to the sample mean and variance you have just calculated.
 Calculate the sample skewness from this simulated sample. Repeat this until you
-have generated 50,000 values of $\hat{\gamma}_1$.
+have generated 50,000 values of $\hat{\gamma}_1$._
 
-(b) Use resampling to obtain a sample of size 13 from your z-data. Calculate the
-sample skewness from this bootstrap sample. Repeat this until you have generated
-50,000 values of $\hat{\gamma}_1$.
+_(b) Use resampling to obtain a sample of size 13 from your z-data. Calculate
+the sample skewness from this bootstrap sample. Repeat this until you have
+generated 50,000 values of $\hat{\gamma}_1$._
 
-(c) Use suitable illustrations to investigate the differences between the two
+_(c) Use suitable illustrations to investigate the differences between the two
 sets of $\hat{\gamma}$ values. Comment on what you observe and whether the
-outcome of your tests confirms the result of the test of normality.
+outcome of your tests confirms the result of the test of normality._
 
 ### Simulating skewness from a normal distribution
 
@@ -504,10 +578,10 @@ ggplot(skew_df, aes(x = skewness, fill = Source)) +
   )
 ```
 
-As shown in Figure \@ref(fig:skewness-densities), the "Simulated Normal" distribution
-is roughly centred on 0. The "Bootstrap Data" distribution is slightly shifted
-to the left (lower than 0) (indicating the data's inherent skew) and is it
-wider, with fatter tails.
+As shown in Figure \@ref(fig:skewness-densities), the "Simulated Normal"
+distribution is roughly centred on 0. The "Bootstrap Data" distribution is
+slightly shifted to the left (lower than 0) (indicating the data's inherent
+skew) and is it wider, with fatter tails.
 
 The sampling distribution of skewness under the simulated Normal condition is
 approximately centred at 0, as expected. The bootstrap distribution based on the
@@ -518,61 +592,231 @@ The small samples drawn from the empirical $z_n$ distribution tend to produce
 more extreme and variable skewness values than one would expect under a normal
 assumption with the same mean and variance, even accounting for the small sample
 size. This observation is in agreement with the Anderson-Darling test
-(&#167;\@ref(elementOneAdtest)) and provides further evidence against an assumption of
-normality for these data.
+(&#167;\@ref(elementOneAdtest)) and provides further evidence against an
+assumption of normality for these data.
 
-## Investigation of constant mean
+## Investigation of constant mean {#elementThr}
 
 ### Instructions (to be removed later)
 
-Divide your $z$ data into 14 subsamples, each representing six months. (If your
+_Divide your $z$ data into 14 subsamples, each representing six months. (If your
 data cleansing has removed all or most of one six-month period, just omit it
 from this analysis.) Compare the means of your subsamples using an appropriate
 illustration, supported by at least one statistical test. [Note that Analysis of
 Variance (ANOVA) is based on an assumption of Normality: if you decide to use
 ANOVA for your test you will need to comment on the Normality, or otherwise, of
-your 7 subsamples.]
+your 7 subsamples.]_
+
+### Visual comparison of means
+
+Want to test second core assumption that the log-returns $z_n$ have a constant
+mean $\mu$\dots
+
+Want to use split() function to divide the data by time periods to create a list
+of 14 xts objects, each representing a 6-month period
 
 ```{r Element 3 pt1 - TBC}
 #---------- Element 3: investigation of constant mean -----------#
+# split z data into 14 subsamples
+z_list <- split(z_n_clean, f = "months", k = 6)
 
+# drop values if all or most of 1 6M period have been removed
+# BE note: have just removed fully blank values, but need to tweak this
+z_list <- z_list[lengths(z_list) > 0]
 
+combined_df_el3 <- bind_rows(lapply(seq_along(z_list), function(i) {
+  data.frame(
+    Period  = factor(names(z_list)[i], levels = names(z_list)),
+    z_value = as.numeric(z_list[[i]])
+  )
+}))
 ```
 
-## Investigation of constant variance
+```{r element3-boxplot, echo=FALSE}
+ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(
+    title = "Log-returns over six-month periods",
+    x = "Six-month period",
+    y = expression(z[n])
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Statistical test
+
+```{r}
+kruskal_res <- kruskal.test(z_value ~ Period, data = combined_df_el3)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+kruskal_df <- data.frame(
+  Test = "Kruskal–Wallis rank sum test",
+  Df = kruskal_res$parameter,
+  Statistic = unname(kruskal_res$statistic),
+  p.value = kruskal_res$p.value
+)
+
+kruskal_df$Statistic <- sprintf("%.3f", kruskal_df$Statistic)
+kruskal_df$p.value <- formatC(kruskal_df$p.value, format = "fg", digits = 4)
+```
+
+```{r kruskal-res, echo=FALSE, message=FALSE, warning=FALSE}
+kable(
+  kruskal_df,
+  caption = "Kruskal–Wallis test outcome for differences in log-return distributions across six-month periods.",
+  booktabs = TRUE,
+  align = c("l", "r", "r", "r"),
+  row.names = FALSE
+) |>
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+From &#167;\@ref(elementOne) & \@ref(elementTwo) we know that our data cannot be
+treated as being normally distributed/shows strong departures from Normality. We
+therefore opted to use a non-parametric alternative to one-way ANOVA.
+
+<!-- We therefore cannot use ANOVA testing as it is based upon an assumption of normality. -->
+
+The Kruskal-Wallis test was used as a non-parametric alternative to one-way
+ANOVA to compare the behaviour of $z_n$ across the six-month periods.
+
+The Kruskal–Wallis test compares the distributions (equivalently, the mean
+ranks) of the groups. Under the null hypothesis $H_0$, all groups share the same
+distribution. If we assume similar spread and shape, this can be interpreted as
+equality of medians (ref!).
+
+This checks for differences in central tendency across groups and the null
+hypothesis ($H_0$) is that the medians of all 14 groups are equal.
+
+As shown in Table \@ref(tab:kruskal-res), there are no statistically significant
+differences in the typical (central) log-return across the periods
+(p=`r signif(kruskal_res$p.value, 3)`) and we do not have sufficient evidence to
+reject $H_0$. This finding is consistent with the assumption of a constant mean
+(or median) log-return over time.
+
+## Investigation of constant variance {#elementFou}
 
 ### Instructions (to be removed later)
 
-Use the same subsamples as for Element 3. Use a suitable illustration to compare
-the spread of your subsamples. Identify the six-month period with the largest
-sample variance and the six-month period with the smallest sample variance. Use
-bootstrapping/resampling to construct a 95% confidence interval for $\sigma^2$
-for each of these two subsamples separately. Comment on any perceived overlap
-between these intervals.
+_Use the same subsamples as for Element 3. Use a suitable illustration to
+compare the spread of your subsamples. Identify the six-month period with the
+largest sample variance and the six-month period with the smallest sample
+variance. Use bootstrapping/resampling to construct a 95% confidence interval
+for $\sigma^2$ for each of these two subsamples separately. Comment on any
+perceived overlap between these intervals._
+
+### Identifying subsamples with max/min variance (chapter 4 in CS1)
 
 ```{r Element 4 pt1 - TBC}
 #---------- Element 4: investigation of constant variance -----------#
-
-
+variances <- sapply(z_list, var, na.rm = TRUE)
+min_var_sample <- which.min(variances)
+max_var_sample <- which.max(variances)
 ```
 
-## Independence of increments
+The six-month period with the largest sample variance is
+`r names(z_list)[min_var_sample]` and the six-month period with the smallest
+sample variance is `r names(z_list)[max_var_sample]`.
+
+```{r element4-violin-bar, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Distributions and variability of cleaned log-returns across six-month periods. Top: violin and boxplot summaries of $z_n$ for each period. Bottom: corresponding sample variances $s^2$, highlighting relative differences in spread."}
+# # Violin + boxplot for spread/shape
+# p_violin <- ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
+#   geom_violin(trim = FALSE, fill = NA, colour = "grey40") +
+#   geom_boxplot(width = 0.08, outlier.size = 0.5) +
+#   theme_bw() +
+#   labs(
+#     title = "Distribution of log-returns across six-month periods",
+#     x = NULL,
+#     y = expression(z[n])
+#   ) +
+#   theme(
+#     axis.text.x = element_blank(),  # hide x labels here
+#     axis.ticks.x = element_blank()
+#   )
+
+# # Bar chart of sample variances
+# p_var <- ggplot(var_df, aes(x = Period, y = Variance)) +
+#   geom_col() +
+#   theme_bw() +
+#   labs(
+#     title = "Sample variance of log-returns by six-month period",
+#     x = "Six-month period",
+#     y = expression(s^2)
+#   ) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#
+
+p_violin <- ggplot(combined_df_el3, aes(x = Period, y = z_value, fill = Period)) +
+  geom_violin(trim = TRUE, colour = "grey20", alpha = 0.4) +
+  geom_boxplot(
+    width = 0.2,
+    outlier.size = 0.5,
+    fill = "white",
+    colour = "black"
+  ) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(
+    title = "Distribution of log-returns across six-month periods",
+    x = NULL,
+    y = expression(z[n])
+  ) +
+  theme(
+    axis.text.x     = element_blank(),
+    axis.ticks.x    = element_blank(),
+    legend.position = "none"
+  )
+
+var_df <- data.frame(
+  Period   = factor(names(z_list), levels = names(z_list)),
+  Variance = as.numeric(variances)
+)
+
+p_var <- ggplot(var_df, aes(x = Period, y = Variance, fill = Period)) +
+  geom_col(alpha = 0.95) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(
+    title = "Sample variance of log-returns by six-month period",
+    x = "Six-month period",
+    y = expression(s^2)
+  ) +
+  theme(
+    axis.text.x     = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )
+
+# Stack vertically with aligned x-axis
+library(patchwork)
+(p_violin / p_var) +
+  plot_layout(heights = c(1, 1))
+```
+
+### Bootstrapping confidence intervals for $\sigma^2$
+
+s
+
+### Commenting on overlap
+
+## Independence of increments {#elementFiv}
 
 ### Instructions (to be removed later)
 
-The Efficient Markets Hypothesis states that the price of an asset today
+_The Efficient Markets Hypothesis states that the price of an asset today
 incorporates all the information which is available about the asset, and
 therefore that any changes to the price between today and tomorrow will be based
 on new, and unpredictable, information which arrives in the meantime. The
 practical result of this is that $z_{n}$ should be independent of both $z_{n−1}$
-and $y_{n−1}$ if the EMH is true.
+and $y_{n−1}$ if the EMH is true.\_
 
-Test the independence of ${z_{n}}$ and ${z_{n-1}}$ by using a contingency table
+_Test the independence of ${z_{n}}$ and ${z_{n-1}}$ by using a contingency table
 procedure. Let $q_1$, $q_2$, $q_3$ represent the sample quartiles of the $z$
 data. Classify each of the $z_n$ observations according to whether it is less
 than q1, between $q_1$ and $q_2$, between $q_2$ and $q_3$, or greater than
 $q_3$. Now draw up the contingency table to determine whether the classification
-of $z_{n}$ is dependent on the classiﬁcation of $z_{n−1}$.
+of $z_{n}$ is dependent on the classiﬁcation of $z_{n−1}$.\_
 
 ```{r Element 5 pt1 - TBC}
 #---------- Element 5: independence of increments -----------#
@@ -580,19 +824,19 @@ of $z_{n}$ is dependent on the classiﬁcation of $z_{n−1}$.
 
 ```
 
-## General upwardness of trend
+## General upwardness of trend {#elementSix}
 
 ### Instructions (to be removed later)
 
-One aspect of the data which might reﬂect a general tendency for the index to
+_One aspect of the data which might reflect a general tendency for the index to
 increase might be the proportion of days when the price increment is positive.
-Test whether this proportion is greater than 0.5.
+Test whether this proportion is greater than 0.5._
 
-Another aspect is the persistence of trends. A “positive run” is a sequence of
+_Another aspect is the persistence of trends. A “positive run” is a sequence of
 consecutive days when $Z_i > 0$; a “negative run” is a sequence of consecutive
 days when $Z_i < 0$. (Note that a run may only be one day in length, or may be
 longer than one day.) Identify the runs in your data set and test whether
-positive runs have longer mean duration than negative runs.
+positive runs have longer mean duration than negative runs. _
 
 ```{r Element 6 pt1 - TBC}
 #---------- Element 6: general upwardness of trend -----------#
@@ -601,6 +845,19 @@ positive runs have longer mean duration than negative runs.
 ```
 
 # Conclusions
+
+While the log-normal model was invalidated by the data's non-normality
+(&#167;\@ref(elementOne) & &#167;\@ref(elementTwo)), non-constant variance
+(&#167;\@ref(elementFou)), and lack of independence ((&#167;\@ref(elementFiv)),
+your analysis for &#167;\@ref(elementThr) did not find statistical evidence to
+reject the assumption of a constant mean.
+
+To be updated:
+
+Based on the Kruskal-Wallis Test the mean log-return appears to be constant over
+time, even as the other core assumptions are violated.
+
+!BE note: check to see if the other assumptions in 4-6 are violated...
 
 ```{=latex}
 \newpage
