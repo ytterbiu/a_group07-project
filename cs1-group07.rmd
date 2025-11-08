@@ -8,7 +8,7 @@ author:
   - "Nivetha Subbiah"
 date: "`r format(Sys.Date(), '%d %B %Y')`"
 output:
-  html_document:
+  bookdown::html_document2:
     self_contained: true
     toc: true
     toc_float: true
@@ -19,7 +19,7 @@ output:
     highlight: tango
     df_print: paged
   # runtime: shiny
-  pdf_document:
+  bookdown::pdf_document2:
     includes:
       in_header: preamble.tex
     number_sections: true
@@ -100,6 +100,15 @@ cat("\014") # Clean console
 ```{r, include=FALSE, echo=FALSE}
 ## dependencies / external librarys
 library(quantmod)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+library(e1071)
+library(kableExtra)
+
+library(summarytools)
+library(nortest) #normality test
 ```
 
 The Nasdaq Composite (`^IXIC`) data was downloaded using the `getSymbols`
@@ -126,12 +135,7 @@ z_n <- na.omit(z_n)
 
 Let's have a quick look at the data.
 
-```{r Initial visualisation}
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(patchwork)
-
+```{r initial-visualisation, fig.cap = "Initial visualisation TBC."}
 # same length as IXIC_ad, first value NA
 z_n_xts <- diff(log(IXIC_ad))
 
@@ -207,7 +211,7 @@ z_n_clean <- na.omit(z_n_clean)
 
 Quick visualisation to compare new vs old:
 
-```{r Plot raw vs clean, echo=FALSE}
+```{r raw-vs-clean, echo=FALSE, fig.cap = "Raw vs clean* TBC"}
 df_raw <- tibble(
   date = index(z_n),
   z_n  = as.numeric(z_n)
@@ -265,8 +269,6 @@ equivalent. Given our relatively large sample size and descriptive aim, the type
 1 definitions are appropriate and fully adequate.
 
 ```{r Element 1 pt2}
-library(e1071)
-library(kableExtra)
 # e1071::skewness(z_n_clean, type = 1)
 
 z_n_clean_numeric <- as.numeric(z_n_clean)
@@ -287,7 +289,9 @@ desc <- tibble(
   )
 ) |>
   mutate(Value = sprintf("%.6f", Value))
+```
 
+```{r zn-desc, echo=FALSE, message=FALSE, warning=FALSE}
 kable(
   desc,
   caption = "Descriptive statistics of cleaned log returns ($z_n$).",
@@ -296,19 +300,17 @@ kable(
   escape = FALSE
 ) |>
   kable_styling(full_width = FALSE, position = "center")
-
 ```
+
 
 BE note: I have included a quick demo of this here:
 
 ```{r Element 1 pt3, echo=FALSE}
-library(e1071)
-library(kableExtra)
 # e1071::skewness(z_n_clean, type = 1)
 
 z_n_clean_numeric <- as.numeric(z_n_clean)
 
-desc <- tibble(
+desc_ad <- tibble(
   Statistic = c(
     "Sample Mean",
     "Sample Variance",
@@ -332,23 +334,21 @@ desc <- tibble(
   )
 ) |>
   mutate(Value = sprintf("%.6f", Value))
+```
 
+```{r zn-desc-ad, echo=FALSE, message=FALSE, warning=FALSE}
 kable(
-  desc,
-  caption = "Descriptive statistics of cleaned log returns ($z_n$).",
+  desc_ad,
+  caption = "Additional descriptive statistics of cleaned log returns ($z_n$).",
   booktabs = TRUE,
   align = c("l", "r"),
   escape = FALSE
 ) |>
   kable_styling(full_width = FALSE, position = "center")
-
 ```
 
 ```{r Element 1 old summary tools, results = "asis", echo=FALSE}
 #---------- Element 1: data cleaning and standard test of normality -----------#
-
-library(summarytools)
-
 summary_table <- descr(
   z_n_clean,
   stats = c("mean", "sd", "skewness", "kurtosis"),
@@ -389,23 +389,23 @@ print(summary_table)
 _Note how the skewness and kurtosis from `summarytools` match the type 3
 skewness and kurtosis from `e1071`._
 
-### Test of normality
+### Test of normality {#elementOneAdtest}
 
-The Anderson-Darling test was chosen to test the normality of these data as is
-it known to be more sensitive to deviations in the tails of the distribution.
-Given that financial log-returns are widely theorised to be leptokurtic
-("fat-tailed"), the Anderson-Darling test is a suitable test for detecting the
-exact type of non-normality that is expected.
-
-Empirical studies consistently find that asset returns (in particular, daily
+Since the 1960's studies have found that asset returns (in particular, daily
 log-returns) are leptokurtic, with a higher peak and heavier tails than the
-normal distribution. This has been notably documented by @Mandelbrot1963 and
-@Fama1965, in addition to being reported as a 'stylized empirical fact' by
-@Cont01022001^[See section 4.1 in @Cont01022001 for a concise summary. BE note:
-consider removing this footnote].
+normal distribution [@Mandelbrot1963; @Fama1965], and in 2001 the heavy tails of
+financial were identified as being a "stylized empirical fact" by
+@Cont01022001^[Where a 'stylized empirical fact' was defined as being
+"properties common across a wide range of instruments, markets and time periods"
+[@Cont01022001 pp. 224]]. The Anderson-Darling test was selected to test the
+normality of these data as is it more sensitive to deviations in the tails of
+the distribution.
+
+<!-- Given that financial log-returns are widely theorised to be leptokurtic
+("fat-tailed"), the Anderson-Darling test is a suitable test for detecting the
+exact type of non-normality that is expected. -->
 
 ```{r Test of normality}
-library(nortest)
 ad_test_result <- ad.test(z_n_clean)
 ad_test_result
 ```
@@ -438,14 +438,88 @@ sample skewness from this bootstrap sample. Repeat this until you have generated
 sets of $\hat{\gamma}$ values. Comment on what you observe and whether the
 outcome of your tests confirms the result of the test of normality.
 
-### Sample size generation
+### Simulating skewness from a normal distribution
 
-```{r Element 2 pt1 - TBC}
+Idea: compare the sampling distribution of skewness from the data against the
+sampling distribution of skewness from a true normal distribution, using the
+parameters from IXIC data.
+
+We are told to use a small n ($n=13$) so would expect non-normal despite
+underlying data being normal.
+
+```{r Element 2 pt1 - Simulating skewness from a normal distribution}
 #---------- Element 2: investigation of normality by resampling -----------#
+# set random seed
+set.seed(1234)
 
+# set parameters from z_data (mean & st-dev)
+z_mean <- mean(z_n_clean)
+z_sd <- sd(z_n_clean)
+N_reps <- 50000
+n_sample_size <- 13
 
+# Simulate 50,000 skewness values using sample size of 13
+skew_normal_sim <- replicate(
+  N_reps, e1071::skewness(rnorm(n_sample_size, z_mean, z_sd), type = 1)
+  )
 ```
 
+### Resampling skewness from $z$-data using bootstrapping
+
+Idea: repeat this process using bootstrapping and z-data.
+
+Non-parametric bootstrap...
+
+```{r Element 2 pt2 - Simulating skewness using bootstrapping}
+# bootstrapping skewness simulation
+skew_bootstrap <- replicate(
+  N_reps, e1071::skewness(sample(z_n_clean, n_sample_size, replace = TRUE), type = 1)
+  )
+```
+
+### Visual comparison and interpretation
+
+An overlapping density plot was used to illustrate the differences between the
+two skewness simulations.
+
+```{r skewness-densities, fig.cap = paste0("Sampling distributions of the skewness estimator for ",N_reps, " samples of size n=", n_sample_size, " taken from a Normal model (blue) and from the empirical log-returns $z_n$ via bootstrap (red).")}
+
+# bootstrapping skewness simulation
+skew_df <- data.frame(
+  skewness = c(skew_normal_sim, skew_bootstrap),
+  Source   = factor(
+    rep(c("Normal model", "Bootstrap from data"),
+        each = N_reps)
+  )
+)
+
+ggplot(skew_df, aes(x = skewness, fill = Source)) +
+  geom_density(alpha = 0.4) +
+  theme_bw() +
+  labs(
+    title = expression("Sampling distributions of " * hat(gamma) *
+                       " for n = 13"),
+    x     = expression(hat(gamma)),
+    y     = "Density"
+  )
+```
+
+As shown in Figure \@ref(fig:skewness-densities), the "Simulated Normal" distribution
+is roughly centred on 0. The "Bootstrap Data" distribution is slightly shifted
+to the left (lower than 0) (indicating the data's inherent skew) and is it
+wider, with fatter tails.
+
+The sampling distribution of skewness under the simulated Normal condition is
+approximately centred at 0, as expected. The bootstrap distribution based on the
+observed $z_{n}$ data is shifted to the left (mid-point <0), reflecting a
+negative skew, and is noticeably more dispersed with heavier tails.
+
+The small samples drawn from the empirical $z_n$ distribution tend to produce
+more extreme and variable skewness values than one would expect under a normal
+assumption with the same mean and variance, even accounting for the small sample
+size. This observation is in agreement with the Anderson-Darling test
+(&#167;\@ref(elementOneAdtest)) and provides further evidence against an assumption of
+normality for these data.
 
 ## Investigation of constant mean
 
@@ -551,9 +625,15 @@ Google Gemini 2.5 Pro (Deep Research), ChatGPT 5
 
 ### Prompts used
 
-The GenAI tools were provided with the 'Coursework Group 7.pdf', our R code, and
-the following queries (non-exhaustive, but we have included an example of each
-type of query used):
+The GenAI tools were provided with the 'Coursework Group 7.pdf' and extracts
+from our R code.
+
+A non-exhaustive list of prompts/queries used is shown below. We opted to
+include at least one example of each _type_ of query used, rather than including
+all queries used. For example, if we entered the prompts/queries 'How can we put
+two ggplots side by side?' and 'How to remove grey background on a ggplot', we
+would only include the first of these in the list below, as both relate to
+plotting issues (& are similar to querying with a traditional search engine).
 
 - "Can you help with outlining the steps for this project."
 - "...the top of both graphs in r are slightly different. (Pasting in R code.)
