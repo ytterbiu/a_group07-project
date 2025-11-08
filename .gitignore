@@ -1,0 +1,20 @@
+# Folders
+.vscode/*
+
+# user settings
+.*DS_Store/*
+.DS_Store
+.Rproj.user
+*.Rproj
+
+# file types
+*.pdf
+*.html
+.gitignore
+.RData
+.Rhistory
+*.tex
+*.css
+
+# files
+cs1-group07.fdb_latexmk

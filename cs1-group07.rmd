@@ -178,15 +178,16 @@ We chose to remove data from ... (need to include paragraph here outlining how
 we chose the dates used: 2020-03-01/2020-05-31 - BE note: these are placeholder
 at the moment just to get the code to work... Something to discuss and justify)
 
-We’re asked to remove data from the 2020/21 COVID-19 period ($log~x_{20May2020}$
-and $log~x_{09Apr2020}$), when markets were heavily disrupted. The extreme,
-policy-driven movements in this window don’t reflect the “normal” behaviour that
-our log-normal model is supposed to capture.
+It is suggested that we remove data from the 2020/21 COVID-19 period
+($log~x_{20May2020}$ and $log~x_{09Apr2020}$), when markets were heavily
+disrupted. The extreme, policy-driven movements in this window can be argued to
+not reflect the “normal” behaviour of the IXIC index.
 
-As noted, if we delete dates from the dataset, we cannot then treat the jump
-between the last date before the gap and the first date after the gap as a valid
-increment ($z_n$). If we calculate log-returns first and only afterwards drop
-rows for the excluded period, our data would contain incorrect 'links'.
+As noted in the assessment instructions, if we delete dates from the dataset, we
+cannot then treat the jump between the last date before the gap and the first
+date after the gap as a valid increment ($z_n$). Calculating log-returns first
+and only afterwards drop rows for the excluded period, our data would contain
+incorrect 'links'.
 
 Cleaning has to happen before we compute any returns.
 
@@ -248,14 +249,14 @@ p_clean <- ggplot(df_clean, aes(date, z_n)) +
 
 ### Sample statistics
 
-Skewness and excess kurtosis are computed using e1071 with type = 1.
+<!-- Skewness and excess kurtosis are computed using e1071 with type = 1. -->
 
 Skewness and excess kurtosis of the cleaned log-returns $z_n$ were computed
-using the `e1071` package in R (ref!) with type = 1. This corresponds to the
+using the `e1071` package in R with type = 1 [@R-e1071]. This corresponds to the
 classical moment-based definitions $m_3/m_2^{3/2}$ and $m_4/m_2{^2}$ described
-by Joanes & Gill (1998) [@joanes1998] (and used in SMM047 2025-26). These
-measures are widely used in textbooks and provide a direct description of the
-shape of the empirical distribution.
+by @joanes1998, and used in SMM047 2025-26 [@gerrard_seg2_notes_questions].
+These measures are widely used in textbooks and provide a direct description of
+the shape of the empirical distribution.
 
 Alternative software implementations, such as the package `summarytools`, were
 considered. These packages apply small-sample bias corrections (“type 3”
@@ -343,9 +344,7 @@ kable(
 
 ```
 
-Output of `summarytools` (the technique introduced in the lab session).
-
-```{r Element 1 old, results = "asis", echo=FALSE}
+```{r Element 1 old summary tools, results = "asis", echo=FALSE}
 #---------- Element 1: data cleaning and standard test of normality -----------#
 
 library(summarytools)
@@ -359,8 +358,17 @@ summary_table <- descr(
   plain.ascii = FALSE,
   style = "rmarkdown"
 )
+```
+
+Output of `summarytools` (the technique introduced in the lab session).
+Summarytools does not output the variance, but we can calculate by squaring the
+standard deviation. Output from `summarytools` for variance is
+`r formatC(summary_table$Std.Dev^2, format = "fg", digits = 4)` , compared to
+`r formatC(var(z_n_clean_numeric), format = "fg", digits = 4)` from `e1071`.
+
+```{r, results = "asis", echo=FALSE}
 print(summary_table)
-summary_table$Std.Dev^2
+# summary_table$Std.Dev^2
 # boxplot(z_n)
 
 
@@ -378,13 +386,23 @@ summary_table$Std.Dev^2
 # boxplot(z_n)
 ```
 
+_Note how the skewness and kurtosis from `summarytools` match the type 3
+skewness and kurtosis from `e1071`._
+
 ### Test of normality
 
 The Anderson-Darling test was chosen to test the normality of these data as is
 it known to be more sensitive to deviations in the tails of the distribution.
-Given that financial log-returns are widely theorized to be leptokurtic
+Given that financial log-returns are widely theorised to be leptokurtic
 ("fat-tailed"), the Anderson-Darling test is a suitable test for detecting the
 exact type of non-normality that is expected.
+
+Empirical studies consistently find that asset returns (in particular, daily
+log-returns) are leptokurtic, with a higher peak and heavier tails than the
+normal distribution. This has been notably documented by @Mandelbrot1963 and
+@Fama1965, in addition to being reported as a 'stylized empirical fact' by
+@Cont01022001^[See section 4.1 in @Cont01022001 for a concise summary. BE note:
+consider removing this footnote].
 
 ```{r Test of normality}
 library(nortest)
@@ -393,25 +411,120 @@ ad_test_result
 ```
 
 The null hypothesis ($H_0$) for the Anderson-Darling test is that the data is
-normally distributed.
-
-The test yields a statistic of A = `r round(ad_test_result$statistic, 1)` with a
-p-value of `r formatC(ad_test_result$p.value, format = "e", digits = 2)`.
-
-We therefore reject $H_0$ in favour of $H_1$. The Anderson-Darling test provides
-strong evidence that the $z_n$ data are not normally distributed.
+normally distributed. The test yields a statistic of A =
+`r round(ad_test_result$statistic, 1)` with a p-value of
+`r formatC(ad_test_result$p.value, format = "e", digits = 2)`. We therefore
+reject $H_0$ in favour of $H_1$. The Anderson-Darling test provides strong
+evidence that the $z_n$ data are not normally distributed.
 
 ## Investigation of normality by resampling
 
+### Instructions (to be removed later)
+
+You are going to investigate whether the difference between your sample and a
+sample from a normal distribution becomes apparent when constructing confidence
+intervals for sample skewness.
+
+(a) Simulate a sample of size 13 from a Normal distribution with mean and
+variance equal to the sample mean and variance you have just calculated.
+Calculate the sample skewness from this simulated sample. Repeat this until you
+have generated 50,000 values of $\hat{\gamma}_1$.
+
+(b) Use resampling to obtain a sample of size 13 from your z-data. Calculate the
+sample skewness from this bootstrap sample. Repeat this until you have generated
+50,000 values of $\hat{\gamma}_1$.
+
+(c) Use suitable illustrations to investigate the differences between the two
+sets of $\hat{\gamma}$ values. Comment on what you observe and whether the
+outcome of your tests confirms the result of the test of normality.
+
+### Sample size generation
+
+```{r Element 2 pt1 - TBC}
+#---------- Element 2: investigation of normality by resampling -----------#
+
+
+```
+
+
 ## Investigation of constant mean
+
+### Instructions (to be removed later)
+
+Divide your $z$ data into 14 subsamples, each representing six months. (If your
+data cleansing has removed all or most of one six-month period, just omit it
+from this analysis.) Compare the means of your subsamples using an appropriate
+illustration, supported by at least one statistical test. [Note that Analysis of
+Variance (ANOVA) is based on an assumption of Normality: if you decide to use
+ANOVA for your test you will need to comment on the Normality, or otherwise, of
+your 7 subsamples.]
+
+```{r Element 3 pt1 - TBC}
+#---------- Element 3: investigation of constant mean -----------#
+
+
+```
 
 ## Investigation of constant variance
 
+### Instructions (to be removed later)
+
+Use the same subsamples as for Element 3. Use a suitable illustration to compare
+the spread of your subsamples. Identify the six-month period with the largest
+sample variance and the six-month period with the smallest sample variance. Use
+bootstrapping/resampling to construct a 95% confidence interval for $\sigma^2$
+for each of these two subsamples separately. Comment on any perceived overlap
+between these intervals.
+
+```{r Element 4 pt1 - TBC}
+#---------- Element 4: investigation of constant variance -----------#
+
+
+```
+
 ## Independence of increments
+
+### Instructions (to be removed later)
+
+The Efficient Markets Hypothesis states that the price of an asset today
+incorporates all the information which is available about the asset, and
+therefore that any changes to the price between today and tomorrow will be based
+on new, and unpredictable, information which arrives in the meantime. The
+practical result of this is that $z_{n}$ should be independent of both $z_{n−1}$
+and $y_{n−1}$ if the EMH is true.
+
+Test the independence of ${z_{n}}$ and ${z_{n-1}}$ by using a contingency table
+procedure. Let $q_1$, $q_2$, $q_3$ represent the sample quartiles of the $z$
+data. Classify each of the $z_n$ observations according to whether it is less
+than q1, between $q_1$ and $q_2$, between $q_2$ and $q_3$, or greater than
+$q_3$. Now draw up the contingency table to determine whether the classification
+of $z_{n}$ is dependent on the classiﬁcation of $z_{n−1}$.
+
+```{r Element 5 pt1 - TBC}
+#---------- Element 5: independence of increments -----------#
+
+
+```
 
 ## General upwardness of trend
 
-TBI
+### Instructions (to be removed later)
+
+One aspect of the data which might reﬂect a general tendency for the index to
+increase might be the proportion of days when the price increment is positive.
+Test whether this proportion is greater than 0.5.
+
+Another aspect is the persistence of trends. A “positive run” is a sequence of
+consecutive days when $Z_i > 0$; a “negative run” is a sequence of consecutive
+days when $Z_i < 0$. (Note that a run may only be one day in length, or may be
+longer than one day.) Identify the runs in your data set and test whether
+positive runs have longer mean duration than negative runs.
+
+```{r Element 6 pt1 - TBC}
+#---------- Element 6: general upwardness of trend -----------#
+
+
+```
 
 # Conclusions
 
@@ -438,12 +551,14 @@ Google Gemini 2.5 Pro (Deep Research), ChatGPT 5
 
 ### Prompts used
 
-The AI tools were provided with the 'Coursework Group 7.pdf', our R code, and
-the following queries (non-exhaustive):
+The GenAI tools were provided with the 'Coursework Group 7.pdf', our R code, and
+the following queries (non-exhaustive, but we have included an example of each
+type of query used):
 
 - "Can you help with outlining the steps for this project."
-- "...the top of both graphs are slightly different. Can this be fixed for the
-  plot area?"
+- "...the top of both graphs in r are slightly different. (Pasting in R code.)
+  Can this be fixed for the plot area?"
+- ...
 
 ### Use of GenAI output
 
