@@ -34,11 +34,11 @@ library(quantmod)
 # Download the data
 getSymbols("^IXIC", from = "2018-01-01", to = "2024-12-31")
 
-MERV_Adj <- na.omit(Ad(MERV))
-plot(MERV_Adj)
+IXIC_Adj <- na.omit(Ad(IXIC))
+plot(IXIC_Adj)
 
-# Calculate the
-z_n = na.omit(log(MERV_Adj / dplyr::lag(MERV_Adj)))
+# Calculate the z_n
+z_n = na.omit(log(IXIC_Adj / dplyr::lag(IXIC_Adj)))
 plot(z_n)
 
 #---------- Element 1: data cleaning and standard test of normality -----------#
@@ -60,13 +60,13 @@ boxplot(z_n)
 
 # # COVID: 10/04/2020-19/05/2020
 #
-MERV_Adj <- MERV_Adj[
-  !((index(MERV_Adj) >= "2020-04-10") &
-    (index(MERV_Adj) <= "2020-05-19"))
+IXIC_Adj <- IXIC_Adj[
+  !((index(IXIC_Adj) >= "2020-04-10") &
+    (index(IXIC_Adj) <= "2020-05-19"))
 ]
 #
 #
-z_n = na.omit(log(MERV_Adj / dplyr::lag(MERV_Adj)))
+z_n = na.omit(log(IXIC_Adj / dplyr::lag(IXIC_Adj)))
 
 plot(z_n)
 boxplot(z_n)

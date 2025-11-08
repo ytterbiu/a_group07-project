@@ -18,23 +18,40 @@ output:
     theme: flatly
     highlight: tango
     df_print: paged
-# runtime: shiny
+  # runtime: shiny
+  pdf_document:
+    includes:
+      in_header: preamble.tex
+    number_sections: true
+    toc: true
+    latex_engine: xelatex
+    citation_package: natbib
+    keep_tex: true
+# fontsize: 10pt
+bibliography: references.bib
 ---
 
-# Key Information
+```{=latex}
+\newpage
+```
 
-## Background
+# Introduction
 
-This R Markdown document was created as part of a group assignment for SMM047 at
-Bayes Business School, City St George's, University of London in Term 1 2025-26.
+## Executive summary
 
-- _BE note: use
-  `rmarkdown::render("MSc_AS-SMM634-Group4-Project.rmd", output_dir = "docs")`
-  to render this document_
+Summary / Abstract here
 
-# Initial processing
+<!-- ## Key Information
 
-```{r setup, include=FALSE}
+### Background
+
+This R Markdown document was created as part of a group assignment for SMM047 at Bayes Business School, City St George's, University of London in Term 1 2025-26.
+
+-   *BE note: use `rmarkdown::render("MSc_AS-SMM634-Group4-Project.rmd", output_dir = "docs")` to render this document* -->
+
+## Initial processing
+
+```{r setup, include=FALSE, echo=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE, message = FALSE, warning = FALSE,
   fig.align = "center", fig.width = 7, fig.height = 7,
@@ -42,67 +59,414 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r}
+```{r, include=FALSE, echo=FALSE}
 dir.create("fig", showWarnings = FALSE)
 knitr::opts_chunk$set(
   fig.path   = "fig/",
   dpi        = 300,
   fig.width  = 6,
   fig.height = 4,
-  dev        = "png"
+  dev        = "pdf"
 )
-knitr::opts_chunk$set(dev = "svglite")
+if (knitr::is_latex_output()) {
+  # For PDF output
+  knitr::opts_chunk$set(
+    fig.path   = "fig/",
+    dpi        = 300,
+    fig.width  = 6,
+    fig.height = 4,
+    dev        = "pdf"
+  )
+} else {
+  # For HTML (or other)
+  knitr::opts_chunk$set(
+    fig.path   = "fig/",
+    dpi        = 300,
+    fig.width  = 6,
+    fig.height = 4,
+    dev        = "svglite"
+    # or "png" if you prefer
+  )
+}
 ```
 
-```{r}
+```{r, include=FALSE, echo=FALSE}
+# Clean environment
+rm(list = ls()) # Remove all objects
+graphics.off() # Close all graphical devices
+cat("\014") # Clean console
+```
+
+```{r, include=FALSE, echo=FALSE}
 ## dependencies / external librarys
 library(quantmod)
 ```
 
-```{r Download data}
+The Nasdaq Composite (`^IXIC`) data was downloaded using the `getSymbols`
+command from the `quantmod` library.
+
+```{r Download data, include=FALSE}
 # Download the data
 getSymbols("^IXIC", from = "2018-01-01", to = "2024-12-31")
 ```
 
-```{r Plot downloaded data}
-IXIC_Adj <- na.omit(Ad(IXIC))
-plot(IXIC_Adj)
+First we can prepare our data, getting the adjusted close price, applying a log
+transform, calculating the log-return increment, and removing NaN values.
 
-# Calculate the ?
-z_n = na.omit(log(IXIC_Adj / dplyr::lag(IXIC_Adj)))
-plot(z_n)
+```{r Prepare data}
+# get adjusted close price
+IXIC_ad <- Ad(IXIC)
+# log transform
+y_n <- log(IXIC_ad)
+# log-return increment (z_n) - get difference in log transformed data
+z_n <- diff(y_n)
+# remove NA values
+z_n <- na.omit(z_n)
 ```
 
-# Element 1: data cleaning and standard test of normality
+Let's have a quick look at the data.
 
-```{r Element 1}
+```{r Initial visualisation}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+
+# same length as IXIC_ad, first value NA
+z_n_xts <- diff(log(IXIC_ad))
+
+df <- tibble(
+  date  = index(IXIC_ad),
+  price = as.numeric(IXIC_ad),
+  z_n   = as.numeric(z_n_xts)
+) %>%
+# drops the first row where z_n is NA
+  drop_na(z_n)
+p1 <- ggplot(df, aes(date, price)) +
+  theme_bw() +
+  geom_line() +
+  labs(
+    title = "NASDAQ Composite\n (Adjusted Close)",
+    x = "Date", y = "Adjusted Close"
+  )
+
+p2 <- ggplot(df, aes(date, z_n)) +
+  geom_line() +
+  theme_bw() +
+  labs(
+    title = expression(Log~Return~Increment~(z[n])),
+    x = "Date",
+    y = expression(z[n])
+  )
+
+# gridExtra::grid.arrange(p1, p2, ncol = 2)
+(p1 | p2) &
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.margin = margin(5.5, 5.5, 5.5, 5.5)
+  )
+
+```
+
+# Individual elements
+
+## Data cleaning and standard test of normality
+
+### Identifying and removing outliers
+
+We chose to remove data from ... (need to include paragraph here outlining how
+we chose the dates used: 2020-03-01/2020-05-31 - BE note: these are placeholder
+at the moment just to get the code to work... Something to discuss and justify)
+
+We’re asked to remove data from the 2020/21 COVID-19 period ($log~x_{20May2020}$
+and $log~x_{09Apr2020}$), when markets were heavily disrupted. The extreme,
+policy-driven movements in this window don’t reflect the “normal” behaviour that
+our log-normal model is supposed to capture.
+
+As noted, if we delete dates from the dataset, we cannot then treat the jump
+between the last date before the gap and the first date after the gap as a valid
+increment ($z_n$). If we calculate log-returns first and only afterwards drop
+rows for the excluded period, our data would contain incorrect 'links'.
+
+Cleaning has to happen before we compute any returns.
+
+```{r Element 1 pt1 - cleaning}
+#---------- Element 1: data cleaning and standard test of normality -----------#
+
+outlier_period <- "2020-03-01/2020-05-31"
+# set all values from outlier period to NA
+y_n_clean <- y_n
+y_n_clean[outlier_period] <- NA
+# calculate log-return increments
+z_n_clean <- diff(y_n_clean)
+z_n_clean_pre_na_drop <- z_n_clean
+# remove NA increments
+z_n_clean <- na.omit(z_n_clean)
+```
+
+Quick visualisation to compare new vs old:
+
+```{r Plot raw vs clean, echo=FALSE}
+df_raw <- tibble(
+  date = index(z_n),
+  z_n  = as.numeric(z_n)
+)
+df_clean <- tibble(
+  date = index(z_n_clean_pre_na_drop),
+  z_n  = as.numeric(z_n_clean_pre_na_drop)
+)
+ylim_all <- range(df_raw$z_n, df_clean$z_n, na.rm = TRUE)
+
+
+p_raw <- ggplot(df_raw, aes(date, z_n)) +
+  geom_line() +
+  theme_bw() +
+  scale_y_continuous(limits = ylim_all) +
+  labs(
+    title = "Log Return Increments\n(pre exclusion)",
+    x = "Date",
+    y = expression(z[n])
+  )
+
+p_clean <- ggplot(df_clean, aes(date, z_n)) +
+  geom_line() +
+  theme_bw() +
+  scale_y_continuous(limits = ylim_all) +
+  labs(
+    title = "Log Return Increments\n(post exclusion)",
+    x = "Date",
+    y = expression(z[n])
+  )
+
+(p_raw | p_clean) &
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.margin = margin(5.5, 5.5, 5.5, 5.5)
+  )
+
+```
+
+### Sample statistics
+
+Skewness and excess kurtosis are computed using e1071 with type = 1.
+
+Skewness and excess kurtosis of the cleaned log-returns $z_n$ were computed
+using the `e1071` package in R (ref!) with type = 1. This corresponds to the
+classical moment-based definitions $m_3/m_2^{3/2}$ and $m_4/m_2{^2}$ described
+by Joanes & Gill (1998) [@joanes1998] (and used in SMM047 2025-26). These
+measures are widely used in textbooks and provide a direct description of the
+shape of the empirical distribution.
+
+Alternative software implementations, such as the package `summarytools`, were
+considered. These packages apply small-sample bias corrections (“type 3”
+estimators), which lead to slightly different values but are asymptotically
+equivalent. Given our relatively large sample size and descriptive aim, the type
+1 definitions are appropriate and fully adequate.
+
+```{r Element 1 pt2}
+library(e1071)
+library(kableExtra)
+# e1071::skewness(z_n_clean, type = 1)
+
+z_n_clean_numeric <- as.numeric(z_n_clean)
+
+desc <- tibble(
+  Statistic = c(
+    "Sample Mean",
+    "Sample Variance",
+    "Skewness (Type 1)",
+    "Excess Kurtosis (Type 1)"
+  ),
+  Value = c(
+    mean(z_n_clean_numeric),
+    var(z_n_clean_numeric),
+    e1071::skewness(z_n_clean_numeric, type = 1),
+    # already excess kurtosis for type = 1
+    e1071::kurtosis(z_n_clean_numeric, type = 1)
+  )
+) |>
+  mutate(Value = sprintf("%.6f", Value))
+
+kable(
+  desc,
+  caption = "Descriptive statistics of cleaned log returns ($z_n$).",
+  booktabs = TRUE,
+  align = c("l", "r"),
+  escape = FALSE
+) |>
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+BE note: I have included a quick demo of this here:
+
+```{r Element 1 pt3, echo=FALSE}
+library(e1071)
+library(kableExtra)
+# e1071::skewness(z_n_clean, type = 1)
+
+z_n_clean_numeric <- as.numeric(z_n_clean)
+
+desc <- tibble(
+  Statistic = c(
+    "Sample Mean",
+    "Sample Variance",
+    "Skewness (Type 1)",
+    "Skewness (Type 2)",
+    "Skewness (Type 3)",
+    "Excess Kurtosis (Type 1)",
+    "Excess Kurtosis (Type 2)",
+    "Excess Kurtosis (Type 3)"
+  ),
+  Value = c(
+    mean(z_n_clean_numeric),
+    var(z_n_clean_numeric),
+    e1071::skewness(z_n_clean_numeric, type = 1),
+    e1071::skewness(z_n_clean_numeric, type = 2),
+    e1071::skewness(z_n_clean_numeric, type = 3),
+    # already excess kurtosis for type = 1
+    e1071::kurtosis(z_n_clean_numeric, type = 1),
+    e1071::kurtosis(z_n_clean_numeric, type = 2),
+    e1071::kurtosis(z_n_clean_numeric, type = 3)
+  )
+) |>
+  mutate(Value = sprintf("%.6f", Value))
+
+kable(
+  desc,
+  caption = "Descriptive statistics of cleaned log returns ($z_n$).",
+  booktabs = TRUE,
+  align = c("l", "r"),
+  escape = FALSE
+) |>
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+Output of `summarytools` (the technique introduced in the lab session).
+
+```{r Element 1 old, results = "asis", echo=FALSE}
 #---------- Element 1: data cleaning and standard test of normality -----------#
 
 library(summarytools)
 
 summary_table <- descr(
-  z_n,
+  z_n_clean,
   stats = c("mean", "sd", "skewness", "kurtosis"),
   transpose = TRUE,
   headings = FALSE,
-  round.digits = 6
+  round.digits = 6,
+  plain.ascii = FALSE,
+  style = "rmarkdown"
 )
 print(summary_table)
-
-
-boxplot(z_n)
+summary_table$Std.Dev^2
+# boxplot(z_n)
 
 
 # # COVID: 10/04/2020-19/05/2020
 #
-IXIC_Adj <- IXIC_Adj[
-  !((index(IXIC_Adj) >= "2020-04-10") &
-    (index(IXIC_Adj) <= "2020-05-19"))
-]
+# IXIC_ad <- IXIC_ad[
+#   !((index(IXIC_ad) >= "2020-04-10") &
+#     (index(IXIC_ad) <= "2020-05-19"))
+# ]
 #
 #
-z_n = na.omit(log(IXIC_Adj / dplyr::lag(IXIC_Adj)))
+# z_n = na.omit(log(IXIC_ad / dplyr::lag(IXIC_ad)))
 
-plot(z_n)
-boxplot(z_n)
+# plot(z_n)
+# boxplot(z_n)
 ```
+
+### Test of normality
+
+The Anderson-Darling test was chosen to test the normality of these data as is
+it known to be more sensitive to deviations in the tails of the distribution.
+Given that financial log-returns are widely theorized to be leptokurtic
+("fat-tailed"), the Anderson-Darling test is a suitable test for detecting the
+exact type of non-normality that is expected.
+
+```{r Test of normality}
+library(nortest)
+ad_test_result <- ad.test(z_n_clean)
+ad_test_result
+```
+
+The null hypothesis ($H_0$) for the Anderson-Darling test is that the data is
+normally distributed.
+
+The test yields a statistic of A = `r round(ad_test_result$statistic, 1)` with a
+p-value of `r formatC(ad_test_result$p.value, format = "e", digits = 2)`.
+
+We therefore reject $H_0$ in favour of $H_1$. The Anderson-Darling test provides
+strong evidence that the $z_n$ data are not normally distributed.
+
+## Investigation of normality by resampling
+
+## Investigation of constant mean
+
+## Investigation of constant variance
+
+## Independence of increments
+
+## General upwardness of trend
+
+TBI
+
+# Conclusions
+
+```{=latex}
+\newpage
+```
+
+# Appendix
+
+## R Code Documentation
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+
+```
+
+## Generative AI Declaration
+
+Generative AI tools were used to assist with project planning and methodological
+validation throughout this project.
+
+### Tools Used
+
+Google Gemini 2.5 Pro (Deep Research), ChatGPT 5
+
+### Prompts used
+
+The AI tools were provided with the 'Coursework Group 7.pdf', our R code, and
+the following queries (non-exhaustive):
+
+- "Can you help with outlining the steps for this project."
+- "...the top of both graphs are slightly different. Can this be fixed for the
+  plot area?"
+
+### Use of GenAI output
+
+The GenAI tools served as a additional group member. Notably, the GenAI output:
+
+- Helped debug plotting issues.
+- Raised potential statistical traps (e.g., the "ANOVA trap" and the "data
+  cleansing order" trap).
+- Suggested appropriate non-parametric tests (Kruskal-Wallis, Wilcoxon Rank-Sum)
+  where the assumptions of parametric tests (ANOVA, t-test) were violated.
+- Recommended specific R packages (nortest, e1071) and functions (ad.test,
+  kruskal.test) best suited for each task.
+- Commented on the structure for the R code and the final report narrative.
+
+### Changes made following GenAI use:
+
+The AI's suggestions were critically reviewed and debated by the group. Plotting
+formatting in ggplot, ... (add others) and... were all implemented following an
+iterative feedback cycle.
+
+The R code for implementation was written and debugged by the group. GenAI tools
+were used, and thought of, in the capacity of an additional group member. All
+final analysis, interpretation, and writing in this report were generated by
+(human) group members.
+
+---
