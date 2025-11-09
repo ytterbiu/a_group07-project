@@ -1034,13 +1034,12 @@ kable(
 The 95% BCa confidence intervals (CI) for the variance ($\sigma^2$) for each of
 these two subsamples are shown in Table \@ref(tab:var-ci). There is no overlap
 between the 95% CI for the 6-month ranges with the minimum and maximum variance
-$\big[`r formatC(var_ci_min_bca[1], format = "fg", digits = 4)`,
-`r formatC(var_ci_min_bca[2], format = "fg", digits = 4)`\big]$
-and
-$\big[`r formatC(var_ci_max_bca[1], format = "fg", digits = 4)`,
-`r formatC(var_ci_max_bca[2], format = "fg", digits = 4)`\big]$,
-respectively. Or in scientific notation the 95% CI for the minimum variance
-subsample is [`r formatC(var_ci_min_bca[1], format = "e", digits = 2)`,
+[`r formatC(var_ci_min_bca[1], format = "fg", digits = 4)`,
+`r formatC(var_ci_min_bca[2], format = "fg", digits = 4)`] and
+[`r formatC(var_ci_max_bca[1], format = "fg", digits = 4)`,
+`r formatC(var_ci_max_bca[2], format = "fg", digits = 4)`], respectively. Or in
+scientific notation the 95% CI for the minimum variance subsample is
+[`r formatC(var_ci_min_bca[1], format = "e", digits = 2)`,
 `r formatC(var_ci_min_bca[2], format = "e", digits = 2)`] and the 95% CI for the
 maximum variance subsample is
 [`r formatC(var_ci_max_bca[1], format = "E", digits = 2)`,
@@ -1076,11 +1075,98 @@ $q_3$_, or greater than_ $q_3$_. Now draw up the contingency table to determine
 whether the classification of_ $z_{n}$ _is dependent on the classiﬁcation of_
 $z_{n−1}$.
 
-```{r Element 5 pt1 - TBC}
+### Data preparation
+
+Want to test fourth assumption - the $z_n$ increments are independent of each
+other.
+
+Test for dependence between $z_n$ and its immediate predecessor, $z_{n-1}$.
+
+Test of the Efficient Markets Hypothesis, which implies that past returns
+($z_{n-1}$) should not predict future returns ($z_n$)
+
+<!-- # ```{r format-p-values} -->
+<!-- # # BE note: can move this up, but have put here to discuss -->
+<!-- # # want to ask Russell -->
+<!-- # format.pval(one$p.value, eps = 0.0001, scientific = FALSE) -->
+<!-- # ``` -->
+
+```{r Element 5 pt1 - independence of increments}
 #---------- Element 5: independence of increments -----------#
+# Create a $z_{n-1}$ series
+z_lag <- stats::lag(z_n_clean, k = 1)
 
+# Align $z_n$ and $z_{n-1}$ pairs by merging the xts objects
+# inner join to remove the NA value created by the lag
+z_merged <- merge(z_n_clean, z_lag, join = "inner")
+colnames(z_merged) <- c("z_n", "z_n_minus_1")
 
+# Categorise by quartile
+# calculate quartiles from whole z_n_clean dataset
+q <- quantile(z_n_clean, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+
+# create categorical variables
+breaks  <- c(-Inf, q, Inf)
+labels  <- c("Q1", "Q2", "Q3", "Q4")
+z_n_cat <- cut(z_merged$z_n, breaks = breaks, labels = labels)
+z_n_minus_1_cat <- cut(z_merged$z_n_minus_1, breaks = breaks, labels = labels)
+
+# contingency
+# rows $z_{n-1}$, columns $z_n$
+con_table <- table(z_n_minus_1_cat, z_n_cat)
+
+# statistical test (want Chi-squared, but need to see if cell frequencies are >5)
+chisq_result <- chisq.test(con_table)
+chisq_result
+chisq_result$expected
+# If any expected counts are low (R will often produce a warning), the $\chi^2$ p-value is unreliable.
+# may then want to use Fisher's Exact Test
+if (any(chisq_result$expected < 5)) {
+  fisher_result <- fisher.test(con_table)
+  fisher_result
+}
+#
 ```
+
+```{r contingency-table, echo=FALSE, message=FALSE, warning=FALSE}
+con_table_df <- as.data.frame.matrix(con_table)
+
+con_table_df <- tibble::tibble(
+  `$z_{n-1}$ quartile` = rownames(con_table),
+  con_table_df
+)
+
+kable(
+  con_table_df,
+  caption = "Contingency table of quartile classifications for lagged log-returns $z_{n-1}$ (rows) and current log-returns $z_n$ (columns).",
+  booktabs = TRUE,
+  align = c("l", rep("r", 4)),
+  escape = FALSE
+) |>
+  add_header_above(
+    c(" " = 1, "$z_n$ quartile" = 4),
+    escape = FALSE
+  ) |>
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+None of the cell frequencies are <5 so we can use chi-squared test.
+
+All expected cell frequencies exceed 5, so the assumptions for Pearson’s
+chi-squared test of independence are satisfied.
+
+The null hypothesis ($H_0$) for both tests is that the row and column variables
+are independent - here that the categorical distribution of the current
+log-return $z_n$ is independent of hte distribution of the lagged log-return
+$z_{n-1}$.
+
+The test returns $\chi^2$(\text{df} = `r chisq_result$parameter`) =
+`r formatC(unname(chisq_result$statistic), format = "f", digits = 2)` with p
+`r format.pval(chisq_result$p.value, eps = 0.0001, scientific = FALSE)`
+(p=`r formatC(chisq_result$p.value, format = 'e', digits = 3)`), so we reject
+$H_0$. This provides statistical evidence that $z_n$ is dependent on the
+classification of $z_{n-1}$ and this finding does not not support the Efficient
+Markets Hypothesis.
 
 ## General upwardness of trend {#elementSix}
 
