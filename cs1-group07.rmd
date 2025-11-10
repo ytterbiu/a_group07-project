@@ -41,6 +41,22 @@ bibliography: references.bib
 
 Summary / Abstract here
 
+Key points (BE clarified with Russell)
+
+- Write for actuarial supervisor (boss, but who understands statistics)
+- Give p-values to 2dp if >0.01, 3dp if <0.01 and if below 0.001 then write
+  <0.001. (BE note: make custom function for in text R functionality)
+- These assumptions are used because they are mathematically convenient, not
+  necessarily because they are true... This is known
+- Don't have to include a load of references, but no harm
+- For each statistical test used, Russell wants to see that we know the
+  conditions for its use (where it can and can't be used and why it's
+  appropriate for use in the case we are discussing).
+
+- Gamma 1 is the skewness and gamma 2 is the kurtosis so double gamma 1's are
+  appropriate in element 2. If wanting to label separately then would use gamma
+  1 x and gamma 1 y (etc.)
+
 <!-- ## Key Information
 
 ### Background
