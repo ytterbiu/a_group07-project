@@ -15,6 +15,7 @@
 .Rhistory
 *.tex
 *.css
+*.xlsx
 
 # files
 cs1-group07.fdb_latexmk

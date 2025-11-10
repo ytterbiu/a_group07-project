@@ -44,11 +44,19 @@ Summary / Abstract here
 Key points (BE clarified with Russell)
 
 - Write for actuarial supervisor (boss, but who understands statistics)
-- Give p-values to 2dp if >0.01, 3dp if <0.01 and if below 0.001 then write
-  <0.001. (BE note: make custom function for in text R functionality)
+
+- Give p-values to 2dp if \>0.01, 3dp if \<0.01 and if below 0.001 then write
+  \<0.001. (BE note: make custom function for in text R functionality)
+
 - These assumptions are used because they are mathematically convenient, not
   necessarily because they are true... This is known
+
 - Don't have to include a load of references, but no harm
+
+- For COVID data need to include data driven justification for the range of
+  dates chosen... This is a good point to include a reference or some kind of
+  metric
+
 - For each statistical test used, Russell wants to see that we know the
   conditions for its use (where it can and can't be used and why it's
   appropriate for use in the case we are discussing).
@@ -57,68 +65,68 @@ Key points (BE clarified with Russell)
   appropriate in element 2. If wanting to label separately then would use gamma
   1 x and gamma 1 y (etc.)
 
+### !BE note: List of outstanding jobs
+
+- Review figure captions
+- Format p-values
+- Identify all statistical tests, list pre-requisites for the tests, then
+  provide justification for our use case C
+
+```{=html}
 <!-- ## Key Information
 
 ### Background
 
 This R Markdown document was created as part of a group assignment for SMM047 at Bayes Business School, City St George's, University of London in Term 1 2025-26.
 
--   *BE note: use `rmarkdown::render("MSc_AS-SMM634-Group4-Project.rmd", output_dir = "docs")` to render this document* -->
-
-## Initial processing
-
-```{r setup, include=FALSE, echo=FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE, message = FALSE, warning = FALSE,
-  fig.align = "center", fig.width = 7, fig.height = 7,
-  out.width = "100%"
-)
+-   *BE note: use `rmarkdown::render("cs1-group07.rmd", output_format = "all")` to render this document* -->
 ```
 
-```{r, include=FALSE, echo=FALSE}
+```{r setup, include=FALSE, echo=FALSE}
+#----------------------- Initial setup (knitr settings) -----------------------#
 dir.create("fig", showWarnings = FALSE)
+
+# Defaults common to all outputs
 knitr::opts_chunk$set(
-  fig.path   = "fig/",
-  dpi        = 300,
-  fig.width  = 6,
-  fig.height = 4,
-  dev        = "pdf"
+  echo     = TRUE,
+  message  = FALSE,
+  warning  = FALSE,
+  fig.align = "center",
+  out.width = "100%",
+  fig.path  = "fig/",
+  dpi       = 300
 )
+
+# Output-specific settings
 if (knitr::is_latex_output()) {
-  # For PDF output
   knitr::opts_chunk$set(
-    fig.path   = "fig/",
-    dpi        = 300,
-    fig.width  = 6,
+    fig.width = 6,
     fig.height = 4,
-    dev        = "pdf"
+    dev = "pdf",
+    fig.pos = "ht",
+    out.extra = ""
   )
-  knitr::opts_chunk$set(fig.pos = "ht", out.extra = "")
 } else {
-  # For HTML (or other)
   knitr::opts_chunk$set(
-    fig.path   = "fig/",
-    dpi        = 300,
-    fig.width  = 6,
+    fig.width = 6,
     fig.height = 4,
-    dev        = "svglite"
-    # or "png" if you prefer
+    dev = "svglite"  # or "png"
   )
 }
 ```
 
 ```{r, include=FALSE, echo=FALSE}
-# Clean environment
+#----------------------------- Clean environment ------------------------------#
 rm(list = ls()) # Remove all objects
 graphics.off() # Close all graphical devices
 cat("\014") # Clean console
 ```
 
 ```{r, include=FALSE, echo=FALSE}
-## dependencies / external librarys
+#------------------- Load dependencies / external libraries -------------------#
 library(quantmod)
-library(xts) #downloading
-library(zoo) #downloading
+library(xts) # for downloading
+library(zoo) # for downloading
 
 library(ggplot2)
 library(dplyr)
@@ -126,23 +134,15 @@ library(tidyr)
 library(patchwork)
 library(kableExtra)
 
-library(e1071)
-library(summarytools)
-library(nortest) #normality test
+library(e1071) # statistical tests
+library(summarytools) # statistical tests (but not used other than demo)
+library(nortest) # normality test
 
-library(boot) #boot strapping
+library(boot) # bootstrapping
 ```
 
-The Nasdaq Composite (`^IXIC`) data was downloaded using the `getSymbols`
-command from the `quantmod` library.
-
-<!-- Old implementation (updated 08/11/2025 to works offline): -->
-<!-- # ```{r Download data, include=FALSE} -->
-<!-- # # Download the data -->
-<!-- # getSymbols("^IXIC", from = "2018-01-01", to = "2024-12-31") -->
-<!-- # ``` -->
-
 ```{r Download data, include=FALSE}
+#---------------------------- Download / Load data ----------------------------#
 # Define inputs & date range
 ticker <- "^IXIC"
 from   <- as.Date("2018-01-01")
@@ -159,21 +159,19 @@ fname <- sprintf(
   format(to,   "%Y%m%d")
 )
 
-
 load_from_csv <- function(path) {
   dat <- read.csv(path, stringsAsFactors = FALSE)
-
   # req date -> if missing force error & re-download
   if (!"Date" %in% names(dat)) {
     stop("CSV does not have expected 'Date' column.")
   }
-
   xts::xts(
     dat[ , setdiff(names(dat), "Date"), drop = FALSE],
     order.by = as.Date(dat$Date)
   )
 }
 
+# Download data from our given ticker
 download_ixic <- function(ticker, from, to) {
   getSymbols(
     ticker,
@@ -184,7 +182,7 @@ download_ixic <- function(ticker, from, to) {
 }
 
 use_download <- FALSE
-
+# Check to see if file exists -> if not then download data
 if (file.exists(fname)) {
   IXIC <- tryCatch(
     load_from_csv(fname),
@@ -199,7 +197,7 @@ if (file.exists(fname)) {
   IXIC <- download_ixic(ticker, from, to)
 }
 
-# If downloaded, rewrite a clean CSV cache
+# If downloaded write/rewrite clean csv
 if (use_download) {
   ixic_df <- data.frame(
     Date = index(IXIC),
@@ -208,14 +206,14 @@ if (use_download) {
   write.csv(ixic_df, fname, row.names = FALSE)
 }
 
-# Download the data
+# (old) Download the data
 # getSymbols("^IXIC", from = "2018-01-01", to = "2024-12-31")
 ```
 
-First we can prepare our data, getting the adjusted close price, applying a log
-transform, calculating the log-return increment, and removing NaN values.
+```{r Prepare data, echo=FALSE}
+# First we prepare our data, getting the adjusted close price, applying a log
+# transform, calculating the log-return increment, and removing NaN values.
 
-```{r Prepare data}
 # get adjusted close price
 IXIC_ad <- Ad(IXIC)
 # log transform
@@ -226,43 +224,83 @@ z_n <- diff(y_n)
 z_n <- na.omit(z_n)
 ```
 
-Let's have a quick look at the data.
+## Background
 
-```{r initial-visualisation, fig.cap = "Initial visualisation TBC."}
+!BE note: want background introductory paragraph here
+
+- https://indexes.nasdaq.com/Index/Overview/COMP
+- https://www.nasdaq.com/solutions/global-indexes/nasdaq-composite
+- (from above: https://indexes.nasdaqomx.com/docs/FS_COMP.pdf
+  https://indexes.nasdaqomx.com/docs/methodology_comp.pdf)
+
+This report analyses the Nasdaq Composite Index (`^IXIC`) using data from
+January 1, 2018, to December 31, 2024. The Nasdaq Composite Index a stock market
+index that includes thousands of stocks listed on the Nasdaq exchange. It's
+heavily focused on technology companies and is widely used as a key benchmark
+for the tech sector's performance. As a result, this index's behaviour can
+impact many financial products (including index-tracking funds).
+
+The adjusted closing price was analysed because, unlike the regular closing
+price, it accounts for corporate actions like dividends and stock splits. This
+gives a much more accurate picture of an investor's actual returns.
+
+The log-returns were calculated from the raw US dollar prices. This metric (BE
+note: is metric the correct word?) measures the daily change in a way that is
+time-additive (meaning daily log-returns sum up to the total log-return for the
+week) and mathematically symmetric (!refs)[^log-symmetry]. This symmetry makes
+log-returns a more suitable method of evaluating an index's volatility and
+day-to-day movements. The data were cleaned and any missing values were removed
+(further data cleaning is described in §\@ref(elementOne)). The historical price
+of the index and its daily log-returns for 2018-2024 are shown in Figure
+\@ref(fig:initial-visualisation).
+
+<!-- Daily adjusted closing values for ^IXIC over the period 1 January 2018 to 31 -->
+<!-- December 2024 were extracted from ... using `getSymbols` from the `quantmod` -->
+<!-- package. These data were then used as the basis for our statistical evaluation -->
+<!-- in this report. Used adjusted closing because -->
+<!-- First we can prepare our data, getting the adjusted close price, applying a log -->
+<!-- transform, calculating the log-return increment, and removing NaN values. -->
+<!-- The Nasdaq Composite Index over the period 1 January 2018 to 31 December 2024, -->
+<!-- and the log-return increment are shown in \@ref(fig:initial-visualisation). -->
+
+```{r initial-visualisation, fig.cap = "Nasdaq Composite price trend and daily volatility (2018–2024). The left figure shows the daily adjusted closing price. The right figure shows the daily log-returns which highlights day-to-day percentage changes and, subsequently, periods of high volatility.", echo = FALSE}
 # same length as IXIC_ad, first value NA
 z_n_xts <- diff(log(IXIC_ad))
 
-df <- tibble(
-  date  = index(IXIC_ad),
+df_initial_ixic <- tibble(
+  date = index(IXIC_ad),
   price = as.numeric(IXIC_ad),
-  z_n   = as.numeric(z_n_xts)
+  z_n = as.numeric(z_n_xts)
 ) %>%
-# drops the first row where z_n is NA
   drop_na(z_n)
-p1 <- ggplot(df, aes(date, price)) +
+
+date_range <- range(df_initial_ixic$date, na.rm = TRUE)
+
+p1_initial_vis <- ggplot(df_initial_ixic, aes(date, price)) +
   theme_bw() +
-  geom_line() +
+  geom_line(linewidth = 0.5) +
   labs(
     title = "NASDAQ Composite\n (Adjusted Close)",
-    x = "Date", y = "Adjusted Close"
+    x = "Date",
+    y = "Adjusted
+Close"
   )
 
-p2 <- ggplot(df, aes(date, z_n)) +
-  geom_line() +
+p2_initial_vis <- ggplot(df_initial_ixic, aes(date, z_n)) +
+  geom_line(linewidth = 0.5) +
   theme_bw() +
   labs(
-    title = expression(Log~Return~Increment~(z[n])),
+    title = expression(Log ~ Return ~ Increment ~ (z[n])),
     x = "Date",
     y = expression(z[n])
   )
 
 # gridExtra::grid.arrange(p1, p2, ncol = 2)
-(p1 | p2) &
+(p1_initial_vis | p2_initial_vis) &
   theme(
     plot.title = element_text(hjust = 0.5),
     plot.margin = margin(5.5, 5.5, 5.5, 5.5)
   )
-
 ```
 
 # Individual elements
@@ -291,15 +329,147 @@ Cleaning has to happen before we compute any returns.
 ```{r Element 1 pt1 - cleaning}
 #---------- Element 1: data cleaning and standard test of normality -----------#
 
-outlier_period <- "2020-03-01/2020-05-31"
+outlier_periods_to_remove <- c(
+  "2020-03-01/2020-04-17",
+  "2021-01-10/2021-03-20",
+  "2022-06-01/2022-07-05"
+)
 # set all values from outlier period to NA
 y_n_clean <- y_n
-y_n_clean[outlier_period] <- NA
+for (p in outlier_periods_to_remove) {
+  y_n_clean[p] <- NA
+}
 # calculate log-return increments
 z_n_clean <- diff(y_n_clean)
 z_n_clean_pre_na_drop <- z_n_clean
 # remove NA increments
 z_n_clean <- na.omit(z_n_clean)
+```
+
+New visualisation to show where the periods to remove are... We will probably
+also want to put these in a table? Or could describe in text - don't feel
+strongly either way.
+
+!BE note: having made Figure \@ref(fig:regions-to-be-removed), think this figure
+combined with an intext description will be best.
+
+```{r regions-to-be-removed, echo = FALSE, fig.cap = "Initial visualisation and regions selected for removal"}
+outlier_df <- tibble(
+  id     = seq_along(outlier_periods_to_remove),
+  period = outlier_periods_to_remove
+) %>%
+  tidyr::separate(period, into = c("start", "end"), sep = "/", convert = TRUE) %>%
+  mutate(
+    start = as.Date(start),
+    end   = as.Date(end),
+    mid   = start + floor(as.numeric(end - start) / 2),
+    label = as.character(id)
+  )
+
+z_n_xts <- diff(log(IXIC_ad))
+
+df <- tibble(
+  date  = index(IXIC_ad),
+  price = as.numeric(IXIC_ad),
+  z_n   = as.numeric(z_n_xts)
+) %>%
+  drop_na(z_n)
+
+range_p1 <- range(df$price, na.rm = TRUE)
+range_p2 <- range(df$z_n,   na.rm = TRUE)
+
+label_y_p1 <- range_p1[2] - 0.08 * diff(range_p1)
+label_y_p2 <- range_p2[2] - 0.02 * diff(range_p2)
+# label_y_p1 <- label_y_p1*1.02
+# label_y_p2 <- label_y_p2*1.2
+
+base_theme <- theme_bw() +
+  theme(
+    plot.title  = element_text(hjust = 0.5),
+    plot.margin = margin(5.5, 5.5, 5.5, 5.5)
+  )
+
+p1 <- ggplot(df, aes(date, price)) +
+  geom_line() +
+  labs(
+    title = "NASDAQ Composite\n(Adjusted Close)",
+    x = "Date", y = "Adjusted Close"
+  ) +
+  base_theme +
+  # vertical dotted lines
+  geom_vline(
+    data = outlier_df,
+    aes(xintercept = start),
+    linetype = "dotted",
+    inherit.aes = FALSE
+  ) +
+  geom_vline(
+    data = outlier_df,
+    aes(xintercept = end),
+    linetype = "dotted",
+    inherit.aes = FALSE
+  ) +
+  # circles
+  geom_point(
+    data = outlier_df,
+    aes(x = mid, y = label_y_p1),
+    inherit.aes = FALSE,
+    shape = 21,
+    fill  = "white",
+    color = "black",
+    size  = 6,
+    stroke = 0.6
+  ) +
+  # numbers
+  geom_text(
+    data = outlier_df,
+    aes(x = mid, y = label_y_p1, label = label),
+    inherit.aes = FALSE,
+    vjust = 0.35,
+    size = 3
+  ) #+
+  #scale_y_continuous(expand = expansion(mult = c(0.02, 0.02)))
+
+p2 <- ggplot(df, aes(date, z_n)) +
+  geom_line() +
+  labs(
+    title = expression(Log~Return~Increment~(z[n])),
+    x = "Date",
+    y = expression(z[n])
+  ) +
+  base_theme +
+  geom_vline(
+    data = outlier_df,
+    aes(xintercept = start),
+    linetype = "dotted",
+    inherit.aes = FALSE
+  ) +
+  geom_vline(
+    data = outlier_df,
+    aes(xintercept = end),
+    linetype = "dotted",
+    inherit.aes = FALSE
+  ) #+
+  # geom_point(
+  #   data = outlier_df,
+  #   aes(x = mid, y = label_y_p2),
+  #   inherit.aes = FALSE,
+  #   shape = 21,
+  #   fill  = "white",
+  #   color = "black",
+  #   size  = 6,
+  #   stroke = 0.6
+  # ) +
+  # geom_text(
+  #   data = outlier_df,
+  #   aes(x = mid, y = label_y_p2, label = label),
+  #   inherit.aes = FALSE,
+  #   vjust = 0.35,
+  #   size = 3
+  # ) #+
+  #scale_y_continuous(expand = expansion(mult = c(0.02, 0.02)))
+
+(p1 / p2)
 ```
 
 Quick visualisation to compare new vs old:
@@ -346,7 +516,7 @@ p_clean <- ggplot(df_clean, aes(date, z_n)) +
 
 ### Sample statistics
 
-<!-- Skewness and excess kurtosis are computed using e1071 with type = 1. -->
+<!-- BE note: Skewness and excess kurtosis are computed using e1071 with type = 1. -->
 
 Skewness and excess kurtosis of the cleaned log-returns $z_n$ were computed
 using the `e1071` package in R with type = 1 [@R-e1071]. This corresponds to the
@@ -440,7 +610,7 @@ kable(
 ```
 
 ```{r Element 1 old summary tools, results = "asis", echo=FALSE}
-#---------- Element 1: data cleaning and standard test of normality -----------#
+#------------------- summarytools demo
 summary_table <- descr(
   z_n_clean,
   stats = c("mean", "sd", "skewness", "kurtosis"),
@@ -487,15 +657,15 @@ Since the 1960's studies have found that asset returns (in particular, daily
 log-returns) are leptokurtic, with a higher peak and heavier tails than the
 normal distribution [@Mandelbrot1963; @Fama1965], and in 2001 the heavy tails of
 financial were identified as being a "stylized empirical fact" by
-@Cont01022001^[Where a 'stylized empirical fact' was defined as being
-"properties common across a wide range of instruments, markets and time periods"
-[@Cont01022001 pp. 224]]. The Anderson-Darling test was selected to test the
-normality of these data as is it more sensitive to deviations in the tails of
-the distribution.
+@Cont01022001[^cont2001quote]. The Anderson-Darling test was selected to test
+the normality of these data as is it more sensitive to deviations in the tails
+of the distribution.
 
+```{=html}
 <!-- Given that financial log-returns are widely theorised to be leptokurtic
 ("fat-tailed"), the Anderson-Darling test is a suitable test for detecting the
 exact type of non-normality that is expected. -->
+```
 
 ```{r Test of normality}
 ad_test_result <- ad.test(z_n_clean)
@@ -520,15 +690,15 @@ intervals for sample skewness._
 _(a) Simulate a sample of size 13 from a Normal distribution with mean and
 variance equal to the sample mean and variance you have just calculated.
 Calculate the sample skewness from this simulated sample. Repeat this until you
-have generated 50,000 values of $\hat{\gamma}_1$._
+have generated 50,000 values of_ $\hat{\gamma}_1$.
 
 _(b) Use resampling to obtain a sample of size 13 from your z-data. Calculate
 the sample skewness from this bootstrap sample. Repeat this until you have
-generated 50,000 values of $\hat{\gamma}_1$._
+generated 50,000 values of_ $\hat{\gamma}_1$.
 
 _(c) Use suitable illustrations to investigate the differences between the two
-sets of $\hat{\gamma}$ values. Comment on what you observe and whether the
-outcome of your tests confirms the result of the test of normality._
+sets of_ $\hat{\gamma}$ values. Comment on what you observe and whether the
+outcome of your tests confirms the result of the test of normality.
 
 ### Simulating skewness from a normal distribution
 
@@ -540,7 +710,7 @@ We are told to use a small n ($n=13$) so would expect non-normal despite
 underlying data being normal.
 
 ```{r Element 2 pt1 - Simulating skewness from a normal distribution}
-#---------- Element 2: investigation of normality by resampling -----------#
+#------------ Element 2: investigation of normality by resampling -------------#
 # set random seed
 set.seed(1234)
 
@@ -589,9 +759,9 @@ ggplot(skew_df, aes(x = skewness, fill = Source)) +
   geom_density(alpha = 0.4) +
   theme_bw() +
   labs(
-    title = expression("Sampling distributions of " * hat(gamma) *
+    title = expression("Sampling distributions of " * hat(gamma)[1] *
                        " for n = 13"),
-    x     = expression(hat(gamma)),
+    x     = expression(hat(gamma)[1]),
     y     = "Density"
   )
 ```
@@ -603,27 +773,27 @@ skew) and is it wider, with fatter tails.
 
 The sampling distribution of skewness under the simulated Normal condition is
 approximately centred at 0, as expected. The bootstrap distribution based on the
-observed $z_{n}$ data is shifted to the left (mid-point <0), reflecting a
+observed $z_{n}$ data is shifted to the left (mid-point \<0), reflecting a
 negative skew, and is noticeably more dispersed with heavier tails.
 
 The small samples drawn from the empirical $z_n$ distribution tend to produce
 more extreme and variable skewness values than one would expect under a normal
 assumption with the same mean and variance, even accounting for the small sample
 size. This observation is in agreement with the Anderson-Darling test
-(&#167;\@ref(elementOneAdtest)) and provides further evidence against an
-assumption of normality for these data.
+(§\@ref(elementOneAdtest)) and provides further evidence against an assumption
+of normality for these data.
 
 ## Investigation of constant mean {#elementThr}
 
 ### Instructions (to be removed later)
 
-_Divide your $z$ data into 14 subsamples, each representing six months. (If your
-data cleansing has removed all or most of one six-month period, just omit it
-from this analysis.) Compare the means of your subsamples using an appropriate
-illustration, supported by at least one statistical test. [Note that Analysis of
-Variance (ANOVA) is based on an assumption of Normality: if you decide to use
-ANOVA for your test you will need to comment on the Normality, or otherwise, of
-your 7 subsamples.]_
+_Divide your_ $z$ data into 14 subsamples, each representing six months. (If
+your data cleansing has removed all or most of one six-month period, just omit
+it from this analysis.) Compare the means of your subsamples using an
+appropriate illustration, supported by at least one statistical test. [Note that
+Analysis of Variance (ANOVA) is based on an assumption of Normality: if you
+decide to use ANOVA for your test you will need to comment on the Normality, or
+otherwise, of your 7 subsamples.]
 
 ### Visual comparison of means
 
@@ -636,21 +806,21 @@ per six-month period is shown in Table \@ref(tab:days-per-six-month-period),
 located in the Appendix.
 
 ```{r Element 3 pt1 - TBC}
-#---------- Element 3: investigation of constant mean -----------#
-# ---------------- attempt 01
-# split z data into 14 subsamples
-z_list <- split(z_n_clean, f = "months", k = 6)
-
-# drop values if all or most of 1 6M period have been removed
-# BE note: have just removed fully blank values, but need to tweak this
-z_list <- z_list[lengths(z_list) > 0]
+#----------------- Element 3: investigation of constant mean ------------------#
+# # ---------------- attempt 01: using flexible 6 month windows
+# # split z data into 14 subsamples
+# z_list <- split(z_n_clean, f = "months", k = 6)
+#
+# # drop values if all or most of 1 6M period have been removed
+# # BE note: have just removed fully blank values, but need to tweak this
+# z_list <- z_list[lengths(z_list) > 0]
 
 # ---------------- attempt 02: new (using hard 6 month cut-offs)
 
 # ensure we have dates
 dates <- index(z_n_clean)
 
-# start boundary: first 6-month block that contains the first date
+# start - first 6-month block that contains the first date
 first_date <- min(dates)
 fy <- as.integer(format(first_date, "%Y"))
 fm <- as.integer(format(first_date, "%m"))
@@ -660,7 +830,7 @@ start0 <- if (fm <= 6) {
   as.Date(sprintf("%d-07-01", fy))
 }
 
-# end boundary: first boundary *after* the last date
+# end - first boundary after the last date
 last_date <- max(dates)
 ly <- as.integer(format(last_date, "%Y"))
 lm <- as.integer(format(last_date, "%m"))
@@ -673,7 +843,7 @@ end_next <- if (lm <= 6) {
 # fixed 6-month breakpoints
 breaks <- seq(start0, end_next, by = "6 months")
 
-# human-readable labels: "01 Jan 2018 - 30 Jun 2018", etc.
+# nice labels "01 Jan 2018 - 30 Jun 2018" etc.
 start_labels <- breaks[-length(breaks)]
 end_labels   <- breaks[-1] - 1
 
@@ -697,7 +867,6 @@ z_list <- split(z_n_clean, Period)
 
 # drop empty periods (where cleaning removed all data)
 z_list <- z_list[lengths(z_list) > 0]
-
 
 combined_df_el3 <- bind_rows(lapply(seq_along(z_list), function(i) {
   data.frame(
@@ -748,7 +917,7 @@ kable(
   kable_styling(full_width = FALSE, position = "center")
 ```
 
-From &#167;\@ref(elementOne) & \@ref(elementTwo) we know that our data cannot be
+From §\@ref(elementOne) & \@ref(elementTwo) we know that our data cannot be
 treated as being normally distributed/shows strong departures from Normality. We
 therefore opted to use a non-parametric alternative to one-way ANOVA.
 
@@ -779,13 +948,13 @@ _Use the same subsamples as for Element 3. Use a suitable illustration to
 compare the spread of your subsamples. Identify the six-month period with the
 largest sample variance and the six-month period with the smallest sample
 variance. Use bootstrapping/resampling to construct a 95% confidence interval
-for $\sigma^2$ for each of these two subsamples separately. Comment on any
-perceived overlap between these intervals._
+for_ $\sigma^2$ for each of these two subsamples separately. Comment on any
+perceived overlap between these intervals.
 
 ### Identifying subsamples with max/min variance (chapter 4 in CS1)
 
 ```{r Element 4 pt1 - processing}
-#---------- Element 4: investigation of constant variance -----------#
+#--------------- Element 4: investigation of constant variance ----------------#
 variances <- sapply(z_list, var, na.rm = TRUE)
 min_var_loc <- which.min(variances)
 max_var_loc <- which.max(variances)
@@ -998,7 +1167,7 @@ p_var <- ggplot(var_df, aes(x = Period, y = Variance, fill = Period)) +
 ### Bootstrapping confidence intervals for $\sigma^2$
 
 ```{r var-ci, echo=FALSE, message=FALSE, warning=FALSE}
-# Build summary table
+# Create summary table
 var_ci_table <- data.frame(
   Subsample = c("Min variance", "Max variance"),
   Period = c(min_period_label, max_period_label),
@@ -1066,10 +1235,15 @@ not the same in both periods. We have evidence therefore to reject the
 assumption of constant variance in these data.
 
 <!-- $\big[`r formatC(var_ci_min_bca[1], format = "fg", digits = 4,small.mark = " ", small.interval = 5L)`, -->
+
 <!-- `r formatC(var_ci_min_bca[2], format = "fg", digits = 4,small.mark = " ", small.interval = 5L)`\big]$ -->
+
 <!-- and -->
+
 <!-- $\big[`r formatC(var_ci_max_bca[1], format = "fg", digits = 4,small.mark = " ", small.interval = 5L)`, -->
+
 <!-- `r formatC(var_ci_max_bca[2], format = "fg", digits = 4,small.mark = " ", small.interval = 5L)`\big]$, -->
+
 <!-- respectively. -->
 
 ## Independence of increments {#elementFiv}
@@ -1102,13 +1276,17 @@ Test of the Efficient Markets Hypothesis, which implies that past returns
 ($z_{n-1}$) should not predict future returns ($z_n$)
 
 <!-- # ```{r format-p-values} -->
+
 <!-- # # BE note: can move this up, but have put here to discuss -->
+
 <!-- # # want to ask Russell -->
+
 <!-- # format.pval(one$p.value, eps = 0.0001, scientific = FALSE) -->
+
 <!-- # ``` -->
 
 ```{r Element 5 pt1 - independence of increments}
-#---------- Element 5: independence of increments -----------#
+#------------------- Element 5: independence of increments --------------------#
 # Create a $z_{n-1}$ series
 z_lag <- stats::lag(z_n_clean, k = 1)
 
@@ -1166,7 +1344,7 @@ kable(
   kable_styling(full_width = FALSE, position = "center")
 ```
 
-None of the cell frequencies are <5 so we can use chi-squared test.
+None of the cell frequencies are \<5 so we can use chi-squared test.
 
 All expected cell frequencies exceed 5, so the assumptions for Pearson’s
 chi-squared test of independence are satisfied.
@@ -1193,17 +1371,17 @@ increase might be the proportion of days when the price increment is positive.
 Test whether this proportion is greater than 0.5._
 
 _Another aspect is the persistence of trends. A “positive run” is a sequence of
-consecutive days when $Z_i > 0$; a “negative run” is a sequence of consecutive
+consecutive days when_ $Z_i > 0$; a “negative run” is a sequence of consecutive
 days when $Z_i < 0$. (Note that a run may only be one day in length, or may be
 longer than one day.) Identify the runs in your data set and test whether
-positive runs have longer mean duration than negative runs. _
+positive runs have longer mean duration than negative runs.
 
 ### Proportion of positive increments
 
-Want to test whether proportion is >0.5 (i.e., occurs over 50% of the time).
+Want to test whether proportion is \>0.5 (i.e., occurs over 50% of the time).
 
 ```{r Element 6 pt1 - proportion of positive increments}
-#---------- Element 6: general upwardness of trend -----------#
+#------------------- Element 6: general upwardness of trend -------------------#
 num_positive <- sum(z_n_clean > 0)
 total_days <- length(z_n_clean)
 # test using binomial (could also approximate, but Russell normally says
@@ -1228,7 +1406,7 @@ Test hypothesis that positive runs (consecutive $z_n > 0$) have a longer mean
 duration than negative runs (consecutive $z_n < 0$)
 
 ```{r Element 6 pt2 - TBC}
-#----------------- Part 2 -----------------#
+#----------------------------- Element 6: part 2 ------------------------------#
 # use run length encoding
 # changing to using z_n_clean_numeric to avoid error
 # 'rle(signs) : 'x' must be a vector of an atomic type'
@@ -1255,7 +1433,7 @@ Null hypothesis is that the mean of positive and negative runs are equal.
 Alternative hypothesis is that the mean of positive runs is greater (so one
 tailed).
 
-Wilcoxon rank sum test with continuity correct has p-value < 0.001 so we have
+Wilcoxon rank sum test with continuity correct has p-value \< 0.001 so we have
 sufficient evidence to reject the null hypothesis in favour of the alternative
 hypothesis (the positive runs have a shift greater than 0).
 
@@ -1264,10 +1442,10 @@ hypothesis (the positive runs have a shift greater than 0).
 # Conclusions
 
 While the log-normal model was invalidated by the data's non-normality
-(&#167;\@ref(elementOne) & &#167;\@ref(elementTwo)), non-constant variance
-(&#167;\@ref(elementFou)), and lack of independence ((&#167;\@ref(elementFiv)),
-our analysis for &#167;\@ref(elementThr) did not find statistical evidence to
-reject the assumption of a constant mean.
+(§\@ref(elementOne) & §\@ref(elementTwo)), non-constant variance
+(§\@ref(elementFou)), and lack of independence (§\@ref(elementFiv)), our
+analysis for §\@ref(elementThr) did not find statistical evidence to reject the
+assumption of a constant mean.
 
 To be updated:
 
@@ -1280,7 +1458,7 @@ time, even as the other core assumptions are violated.
   are not normally distributed
 - element 2: bootstrapping with z-data and normal distribution also provides
   evidence against an assumption of normality
-- element 3: Kruskal–Wallis test -> we accept null hypothesis that measures of
+- element 3: Kruskal–Wallis test -\> we accept null hypothesis that measures of
   central tendancy of log-returns over six-month periods share the same
   distribution (/medians are the same?)
 - element 4: 95% BCa confidence intervals do not overlap, providing statistical
@@ -1290,10 +1468,10 @@ time, even as the other core assumptions are violated.
   indendent. BUT haven't checked for $y_{n-1}$ as not sure what this is...
 - element 6:
   - Part 1: Binomial test revealed proportion of positive-return days is
-    statistically greater than 50% (insert p <0.001), confirming a general
+    statistically greater than 50% (insert p \<0.001), confirming a general
     upward bias.
   - Part 2: Wilcoxon rank sum test with continuity correction provided
-    sufficient statistical evidence (p<0.001) to reject null hypothesis in
+    sufficient statistical evidence (p\<0.001) to reject null hypothesis in
     favour of alternative hypothesis that the positive runs have a greater
     mean/median/distribution that the negative runs.
 
@@ -1315,6 +1493,7 @@ shown in Figure \@ref(fig:element3-boxplot).
 ![](fig/element3-boxplot-1.pdf)
 
 ```{r days-per-six-month-period, echo=FALSE, message=FALSE, warning=FALSE}
+#---------- Appendix: check & count observations in 6-month periods -----------#
 # Count observations in each 6-month period
 days_per_period <- sapply(z_list, NROW)
 
@@ -1379,6 +1558,8 @@ plotting issues (& are similar to querying with a traditional search engine).
 - "Can you help with outlining the steps for this project."
 - "...the top of both graphs in r are slightly different. (Pasting in R code.)
   Can this be fixed for the plot area?"
+- "Help phrasing this in a simple and accessible way - remove any jargon &
+  identify the key points"
 - ...
 
 ### Use of GenAI output
@@ -1406,3 +1587,19 @@ final analysis, interpretation, and writing in this report were generated by
 (human) group members.
 
 ---
+
+```
+
+```
+
+[^log-symmetry]:
+    With simple percentages, a 100% gain (+100%) is not cancelled out by a 100%
+    loss (−100%). It's cancelled out by a 50% loss (−50%). This asymmetry makes
+    statistical modeling difficult. With log-returns, a move from $100 to $200
+    (a log-return of +0.693) is the exact mathematical opposite of a move from
+    $200 to $100 (a log-return of −0.693).
+
+[^cont2001quote]:
+    Where a 'stylized empirical fact' was defined as being "properties common
+    across a wide range of instruments, markets and time periods" [@Cont01022001
+    pp. 224]
