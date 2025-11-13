@@ -1762,14 +1762,18 @@ Rough notes:
 - We can assume the market has absorbed the shock of announcement of COVID-19.
 - Line LU2 Captures on upcoming Uptrend
 
-![changes in the Nasdaq Composite index from x – y.  Analysis was carried out to](fig/appendix-COVID19-selection.pdf)
+```{r, echo=FALSE, out.width="70%", fig.cap="Changes in the Nasdaq Composite index from x – y.  Analysis was carried out to..."}
+knitr::include_graphics("fig/appendix-COVID19-selection.pdf")
+```
 
 ## Additional tables and figures
 
 In \S\@ref(elementThr) the log-returns data were split into six-month periods,
 as shown in Figure \@ref(fig:element3-boxplot).
 
-![](fig/element3-boxplot-1.pdf)
+```{r, echo=FALSE, out.width="70%"}
+knitr::include_graphics("fig/element3-boxplot-1.pdf")
+```
 
 ```{r appendix-setup, echo=FALSE, message=FALSE, warning=FALSE}
 #---------- Appendix: check & count observations in 6-month periods -----------#
