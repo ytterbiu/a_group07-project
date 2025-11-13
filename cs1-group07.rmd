@@ -65,13 +65,6 @@ Key points (BE clarified with Russell)
   appropriate in element 2. If wanting to label separately then would use gamma
   1 x and gamma 1 y (etc.)
 
-### !BE note: List of outstanding jobs
-
-- Review figure captions
-- Format p-values
-- Identify all statistical tests, list pre-requisites for the tests, then
-  provide justification for our use case C
-
 ```{=html}
 <!-- ## Key Information
 
@@ -82,7 +75,7 @@ This R Markdown document was created as part of a group assignment for SMM047 at
 -   *BE note: use `rmarkdown::render("cs1-group07.rmd", output_format = "all")` to render this document* -->
 ```
 
-```{r setup, include=FALSE, echo=FALSE}
+```{r setup-knitr, include=FALSE, echo=FALSE}
 #----------------------- Initial setup (knitr settings) -----------------------#
 dir.create("fig", showWarnings = FALSE)
 
@@ -115,14 +108,14 @@ if (knitr::is_latex_output()) {
 }
 ```
 
-```{r, include=FALSE, echo=FALSE}
+```{r setup-qol, include=FALSE, echo=FALSE}
 #----------------------------- Clean environment ------------------------------#
 rm(list = ls()) # Remove all objects
 graphics.off() # Close all graphical devices
 cat("\014") # Clean console
 ```
 
-```{r, include=FALSE, echo=FALSE}
+```{r load-dependencies, include=FALSE, echo=FALSE}
 #------------------- Load dependencies / external libraries -------------------#
 library(quantmod)
 library(xts) # for downloading
@@ -141,7 +134,54 @@ library(nortest) # normality test
 library(boot) # bootstrapping
 ```
 
-```{r Download data, include=FALSE}
+```{r custom-functions, include=FALSE, echo=FALSE}
+#---------------------------- Custom QOL functions ----------------------------#
+# function: banner comments (used to to section up code)
+# Usage: cat(banner_comment("Element 1: data cleaning"), "\n")
+banner_comment <- function(text, width = 80,
+                           border = "#", fill = "-") {
+  txt <- paste0(" ", text, " ")
+  inner_width <- width - 2 * nchar(border)
+
+  if (inner_width <= nchar(txt)) {
+    return(paste0(border, txt, border))
+  }
+
+  pad_total <- inner_width - nchar(txt)
+  pad_left  <- pad_total %/% 2
+  pad_right <- pad_total - pad_left
+
+  paste0(
+    border,
+    strrep(fill, pad_left),
+    txt,
+    strrep(fill, pad_right),
+    border
+  )
+}
+# function: format p-values for text
+format_p_vals <- function(p) {
+  if (length(p) != 1L || is.na(p)) {
+    stop("Error! p must be a single non-missing value")
+  }
+  if (p > 1) {
+    stop("Error! Value greater than 1")
+  }
+  if (p < 0) {
+    stop("Error! Value less than 0")
+  }
+
+  if (p >= 0.01) {
+    paste0("= ", formatC(p, format = "f", digits = 2))
+  } else if (p >= 0.001) {
+    paste0("= ", formatC(p, format = "f", digits = 3))
+  } else {
+    "< 0.001"
+  }
+}
+```
+
+```{r Download-data, include=FALSE}
 #---------------------------- Download / Load data ----------------------------#
 # Define inputs & date range
 ticker <- "^IXIC"
@@ -250,8 +290,8 @@ time-additive (meaning daily log-returns sum up to the total log-return for the
 week) and mathematically symmetric (!refs)[^log-symmetry]. This symmetry makes
 log-returns a more suitable method of evaluating an index's volatility and
 day-to-day movements. The data were cleaned and any missing values were removed
-(further data cleaning is described in §\@ref(elementOne)). The historical price
-of the index and its daily log-returns for 2018-2024 are shown in Figure
+(further data cleaning is described in \S\@ref(elementOne)). The historical
+price of the index and its daily log-returns for 2018-2024 are shown in Figure
 \@ref(fig:initial-visualisation).
 
 <!-- Daily adjusted closing values for ^IXIC over the period 1 January 2018 to 31 -->
@@ -263,7 +303,7 @@ of the index and its daily log-returns for 2018-2024 are shown in Figure
 <!-- The Nasdaq Composite Index over the period 1 January 2018 to 31 December 2024, -->
 <!-- and the log-return increment are shown in \@ref(fig:initial-visualisation). -->
 
-```{r initial-visualisation, fig.cap = "Nasdaq Composite price trend and daily volatility (2018–2024). The left figure shows the daily adjusted closing price. The right figure shows the daily log-returns which highlights day-to-day percentage changes and, subsequently, periods of high volatility.", echo = FALSE}
+```{r initial-visualisation, fig.cap = "Nasdaq Composite price trend and daily volatility (2018–2024). The left figure shows the daily adjusted closing price. The right figure shows the daily log-returns, highlighting day-to-day percentage changes and volitility.", echo = FALSE}
 # same length as IXIC_ad, first value NA
 z_n_xts <- diff(log(IXIC_ad))
 
@@ -309,30 +349,45 @@ p2_initial_vis <- ggplot(df_initial_ixic, aes(date, z_n)) +
 
 ### Identifying and removing outliers
 
-We chose to remove data from ... (need to include paragraph here outlining how
-we chose the dates used: 2020-03-01/2020-05-31 - BE note: these are placeholder
-at the moment just to get the code to work... Something to discuss and justify)
+A review of the Nasdaq Composite adjusted closing price over 2018-2024 was
+undertaken to identify and extract the dates of periods of elevated volatility.
+Potential outliers were considered for exclusion if the volatility did not arise
+from legitimate market activity. A timeline showing regions of volatility and
+their primary attributable causes are shown in Figure !x. Following numerical
+analysis (!describe) and group discussion, only one period associated with onset
+of the COVID-19 pandemic was selected for exclusion. The data driven procedure
+used to define the COVID-19 exclusion window is described in more detail in the
+appendix (\S\@ref(apd-COVID19-selection)).
 
-It is suggested that we remove data from the 2020/21 COVID-19 period
-($log~x_{20May2020}$ and $log~x_{09Apr2020}$), when markets were heavily
-disrupted. The extreme, policy-driven movements in this window can be argued to
-not reflect the “normal” behaviour of the IXIC index.
+We acknowledge that what constitutes “legitimate” market activity is itself
+debatable. One could potentially exclude other volatile periods, but doing so
+would not align with the aim of this analysis, which is to test how well the
+standard log-return model describes the behaviour of the Nasdaq Composite under
+realistic market conditions.
 
-As noted in the assessment instructions, if we delete dates from the dataset, we
-cannot then treat the jump between the last date before the gap and the first
-date after the gap as a valid increment ($z_n$). Calculating log-returns first
-and only afterwards drop rows for the excluded period, our data would contain
-incorrect 'links'.
+<!-- It is suggested that we remove data from the 2020/21 COVID-19 period -->
+<!-- ($log~x_{20May2020}$ and $log~x_{09Apr2020}$), when markets were heavily -->
+<!-- disrupted. The extreme, policy-driven movements in this window can be argued to -->
+<!-- not reflect the “normal” behaviour of the IXIC index. -->
 
-Cleaning has to happen before we compute any returns.
+<!-- As noted in the assessment instructions, if we delete dates from the dataset, we -->
+<!-- cannot then treat the jump between the last date before the gap and the first -->
+<!-- date after the gap as a valid increment ($z_n$). Calculating log-returns first -->
+<!-- and only afterwards drop rows for the excluded period, our data would contain -->
+<!-- incorrect 'links'. -->
 
-```{r Element 1 pt1 - cleaning}
+<!-- Cleaning has to happen before we compute any returns. -->
+
+```{r Element 1 - cleaning}
 #---------- Element 1: data cleaning and standard test of normality -----------#
 
+# outlier_periods_to_remove <- c(
+#   "2020-03-01/2020-04-17",
+#   "2021-01-10/2021-03-20",
+#   "2022-06-01/2022-07-05"
+# )
 outlier_periods_to_remove <- c(
-  "2020-03-01/2020-04-17",
-  "2021-01-10/2021-03-20",
-  "2022-06-01/2022-07-05"
+  "2020-02-24/2020-03-23"
 )
 # set all values from outlier period to NA
 y_n_clean <- y_n
@@ -520,10 +575,10 @@ p_clean <- ggplot(df_clean, aes(date, z_n)) +
 
 Skewness and excess kurtosis of the cleaned log-returns $z_n$ were computed
 using the `e1071` package in R with type = 1 [@R-e1071]. This corresponds to the
-classical moment-based definitions $m_3/m_2^{3/2}$ and $m_4/m_2{^2}$ described
-by @joanes1998, and used in SMM047 2025-26 [@gerrard_seg2_notes_questions].
-These measures are widely used in textbooks and provide a direct description of
-the shape of the empirical distribution.
+classical moment-based definitions $m_3/m_2^{3/2}$ and $m_4/m_2{^2} - 3$
+described by @joanes1998, and used in SMM047 2025-26
+[@gerrard_seg2_notes_questions]. These measures are widely used in textbooks and
+provide a direct description of the shape of the empirical distribution.
 
 Alternative software implementations, such as the package `summarytools`, were
 considered. These packages apply small-sample bias corrections (“type 3”
@@ -653,14 +708,6 @@ skewness and kurtosis from `e1071`._
 
 ### Test of normality {#elementOneAdtest}
 
-Since the 1960's studies have found that asset returns (in particular, daily
-log-returns) are leptokurtic, with a higher peak and heavier tails than the
-normal distribution [@Mandelbrot1963; @Fama1965], and in 2001 the heavy tails of
-financial were identified as being a "stylized empirical fact" by
-@Cont01022001[^cont2001quote]. The Anderson-Darling test was selected to test
-the normality of these data as is it more sensitive to deviations in the tails
-of the distribution.
-
 ```{=html}
 <!-- Given that financial log-returns are widely theorised to be leptokurtic
 ("fat-tailed"), the Anderson-Darling test is a suitable test for detecting the
@@ -672,12 +719,32 @@ ad_test_result <- ad.test(z_n_clean)
 ad_test_result
 ```
 
-The null hypothesis ($H_0$) for the Anderson-Darling test is that the data is
-normally distributed. The test yields a statistic of A =
-`r round(ad_test_result$statistic, 1)` with a p-value of
-`r formatC(ad_test_result$p.value, format = "e", digits = 2)`. We therefore
-reject $H_0$ in favour of $H_1$. The Anderson-Darling test provides strong
-evidence that the $z_n$ data are not normally distributed.
+!BE note: background on Anderson-Darling test
+https://www.6sigma.us/six-sigma-in-focus/anderson-darling-normality-test/
+
+Since the 1960's studies have found that asset returns (in particular, daily
+log-returns) are leptokurtic, with a higher peak and heavier tails than the
+normal distribution [@Mandelbrot1963; @Fama1965]. So much so that in 2001 the
+heavy tails of financial were identified as being a "stylized empirical fact" by
+@Cont01022001[^cont2001quote].
+
+The Anderson-Darling test is an appropriate test for these data. It
+
+- List properties...
+- Include reference
+
+was selected to test the normality of these data as is it more sensitive to
+deviations in the tails of the distribution.
+
+The null hypothesis ($H_0$) for the Anderson-Darling test is that the data are
+normally distributed.
+
+Normality was assessed using the Anderson-Darling test, with a test statistic of
+A = `r round(ad_test_result$statistic, 1)` (p
+`r format_p_vals(ad_test_result$p.value)`). We therefore reject the null
+hypothesis that the data are normally distributed ($H_0$), in favour of the
+alternative hypothesis $H_1$. The Anderson-Darling test provides strong evidence
+that the $z_n$ data are not normally distributed.
 
 ## Investigation of normality by resampling {#elementTwo}
 
@@ -700,7 +767,7 @@ _(c) Use suitable illustrations to investigate the differences between the two
 sets of_ $\hat{\gamma}$ values. Comment on what you observe and whether the
 outcome of your tests confirms the result of the test of normality.
 
-### Simulating skewness from a normal distribution
+### Simulating skewness from resampling a normal distribution & from $z$-data using bootstrapping
 
 Idea: compare the sampling distribution of skewness from the data against the
 sampling distribution of skewness from a true normal distribution, using the
@@ -709,7 +776,11 @@ parameters from IXIC data.
 We are told to use a small n ($n=13$) so would expect non-normal despite
 underlying data being normal.
 
-```{r Element 2 pt1 - Simulating skewness from a normal distribution}
+Idea: then repeat this process using bootstrapping and z-data.
+
+Non-parametric bootstrap...
+
+```{r Element 2 pt1 - Simulating skewness from a normal distribution, cache = FALSE}
 #------------ Element 2: investigation of normality by resampling -------------#
 # set random seed
 set.seed(1234)
@@ -724,19 +795,168 @@ n_sample_size <- 13
 skew_normal_sim <- replicate(
   N_reps, e1071::skewness(rnorm(n_sample_size, z_mean, z_sd), type = 1)
   )
-```
 
-### Resampling skewness from $z$-data using bootstrapping
-
-Idea: repeat this process using bootstrapping and z-data.
-
-Non-parametric bootstrap...
-
-```{r Element 2 pt2 - Simulating skewness using bootstrapping}
 # bootstrapping skewness simulation
 skew_bootstrap <- replicate(
   N_reps, e1071::skewness(sample(z_n_clean, n_sample_size, replace = TRUE), type = 1)
   )
+
+#------------ basic
+skew_normal_sim_median <- median(skew_normal_sim)
+skew_normal_bootstrap  <- median(skew_bootstrap)
+sd(skew_normal_sim)
+sd(skew_bootstrap)
+el2_original_skew <- e1071::skewness(z_n_clean, type = 1)
+el2_bias <- mean(skew_bootstrap) - el2_original_skew
+
+#------------ statistics/metrics
+# calculating quantile based confidence interval
+print(quantile(skew_bootstrap, probs = c(0.025, 0.975)))
+print(quantile(skew_normal_sim, probs = c(0.025, 0.975)))
+```
+
+```{r el2-testing, echo=FALSE, cache = FALSE}
+
+# Using open source: https://gitlab.com/scottkosty/bootstrap/-/blob/master/R/bcanon.R
+#
+# Takes a vector of observations x, the number of bootstrap samples to take,
+# an estimator plus additional parameters for it, and confidence levels for
+# the output intervals
+"bcanon" <- function(x,nboot,theta,...,alpha =
+                     c(.025,.05,.1,.16,.84,.9,.95,.975)) {
+    if (!all(alpha < 1) || !all(alpha > 0))
+      stop("All elements of alpha must be in (0,1)")
+
+    # NB. these lines check that nboot > (1 / alpha) and because otherwise
+    # you need more samples to get a somewhat useful confidence interval.
+    alpha_sorted <- sort(alpha)
+    if (nboot <= 1/min(alpha_sorted[1],1-alpha_sorted[length(alpha_sorted)]))
+      warning("nboot is not large enough to estimate your chosen alpha.")
+
+    # unrelated to the actual bootstrapping
+    call <- match.call()
+
+    # compute theta(x) of the samples and resample the data nboot times
+    n <- length(x)
+    thetahat <- theta(x,...)
+    bootsam<- matrix(sample(x,size=n*nboot,replace=TRUE),nrow=nboot)
+
+    # compute theta for each sample and compute the quartile of the fraction
+    # below our original estimate under a normal distribution
+    thetastar <- apply(bootsam,1,theta,...)
+    z0 <- qnorm(sum(thetastar<thetahat)/nboot)
+
+    # get a jackknife estimate for theta to compute the acceleration factor
+    u <- rep(0,n)
+    for(i in 1:n){
+        u[i] <- theta(x[-i],...)
+    }
+    uu <- mean(u)-u
+    acc <- sum(uu*uu*uu)/(6*(sum(uu*uu))^1.5)
+
+    # compute the actual distribution that we are taking the quantiles of to
+    # create the confidence interval
+    zalpha <- qnorm(alpha)
+
+    tt <- pnorm(z0+ (z0+zalpha)/(1-acc*(z0+zalpha)))
+
+    confpoints <- quantile(x=thetastar,probs=tt,type=1)
+
+    # and now just some logic for outputting it
+    names(confpoints) <- NULL
+    confpoints <- cbind(alpha,confpoints)
+    dimnames(confpoints)[[2]] <- c("alpha","bca point")
+    return(list(confpoints=confpoints,
+                z0=z0,
+                acc=acc,
+                u=u,
+                call=call))
+}
+```
+
+```{r , echo=FALSE, cache = FALSE}
+
+#------------ BCa interval for skewness using bcanon
+bca_skew <- bcanon(
+  x     = z_n_clean,
+  nboot = N_reps,
+  alpha = c(.025,.975),
+  theta = e1071::skewness,
+  type  = 1
+)
+
+# calculating quantile based confidence interval
+print(quantile(skew_bootstrap, probs = c(0.025, 0.975)))
+print(quantile(skew_normal_sim, probs = c(0.025, 0.975)))
+
+# alpha and corresponding BCa points
+print(bca_skew$confpoints)
+
+skew_boot_full <- replicate(
+  N_reps,
+  e1071::skewness(sample(z_n_clean, length(z_n_clean), replace = TRUE), type = 1)
+)
+
+quantile(skew_boot_full, c(0.025, 0.975))
+
+#------------ 95% CIs for comparison ----------
+
+# (1) Normal-based parametric CI via simulation, n = 13
+el2_ci_normal_95 <- quantile(skew_normal_sim, probs = c(0.025, 0.975))
+
+# (2) Bootstrap percentile CI from empirical data, n = 13
+el2_ci_boot_95 <- quantile(skew_bootstrap, probs = c(0.025, 0.975))
+
+# (3) (bonus) BCa bootstrap CI for skewness using full data, n = 1651
+bca_skew <- bcanon(
+  x     = z_n_clean,
+  nboot = N_reps,
+  theta = e1071::skewness,
+  type  = 1,
+  alpha = c(0.025, 0.975)
+)
+
+el2_ci_bca_95 <- bca_skew$confpoints[, "bca point"]
+
+ci_table <- data.frame(
+  Method = c(
+    "Simulated normal percentile",
+    "Bootstrap percentile",
+    "BCa bootstrap (full data)"
+  ),
+  N = c(
+    n_sample_size,
+    n_sample_size,
+    length(z_n_clean)
+  ),
+  Lower = c(
+    el2_ci_normal_95[1],
+    el2_ci_boot_95[1],
+    el2_ci_bca_95[1]
+  ),
+  Upper = c(
+    el2_ci_normal_95[2],
+    el2_ci_boot_95[2],
+    el2_ci_bca_95[2]
+  )
+)
+```
+
+```{r skewness-95CI, echo=FALSE, message=FALSE, warning=FALSE}
+kable(
+  ci_table,
+  caption = "Comparison of 95 percent confidence intervals for skewness under different approaches.",
+  booktabs = TRUE,
+  align = c("l", rep("r", 3)),
+  digits = 3,
+  row.names = FALSE,
+  escape = FALSE
+) |>
+  add_header_above(
+    c(" " = 2, "95 percent CI" = 2),
+    escape = FALSE
+  ) |>
+  kable_styling(full_width = FALSE, position = "center")
 ```
 
 ### Visual comparison and interpretation
@@ -771,6 +991,26 @@ distribution is roughly centred on 0. The "Bootstrap Data" distribution is
 slightly shifted to the left (lower than 0) (indicating the data's inherent
 skew) and is it wider, with fatter tails.
 
+!BE note: Here we have done two separate things.
+
+- The first is the task specified in the document, bootstrapping the data using
+  a subsampling approach (sometimes called m-out-of-n)
+- The second is bootstrapping the data using the full data
+
+- I think our data are iid (independent and identically distributed - confirmed
+  in lab 2), or we can assume as much. We are estimating skewness -> I think the
+  n-out-of-n (or full) bootstrap can be used.
+  - Generally for CI
+
+The implementation for this report utilised caching to store the R objects
+generated in a code chunk to a cache database.
+
+Refs to use, for jackknife bootstrap
+
+- https://sites.stat.washington.edu/courses/stat527/s14/readings/ann_stat1979.pdf
+- (general bootstrap intervals)
+  https://projecteuclid.org/journals/statistical-science/volume-11/issue-3/Bootstrap-confidence-intervals/10.1214/ss/1032280214.pdf
+
 The sampling distribution of skewness under the simulated Normal condition is
 approximately centred at 0, as expected. The bootstrap distribution based on the
 observed $z_{n}$ data is shifted to the left (mid-point \<0), reflecting a
@@ -780,7 +1020,7 @@ The small samples drawn from the empirical $z_n$ distribution tend to produce
 more extreme and variable skewness values than one would expect under a normal
 assumption with the same mean and variance, even accounting for the small sample
 size. This observation is in agreement with the Anderson-Darling test
-(§\@ref(elementOneAdtest)) and provides further evidence against an assumption
+(\S\@ref(elementOneAdtest)) and provides further evidence against an assumption
 of normality for these data.
 
 ## Investigation of constant mean {#elementThr}
@@ -917,7 +1157,7 @@ kable(
   kable_styling(full_width = FALSE, position = "center")
 ```
 
-From §\@ref(elementOne) & \@ref(elementTwo) we know that our data cannot be
+From \S\@ref(elementOne) & \@ref(elementTwo) we know that our data cannot be
 treated as being normally distributed/shows strong departures from Normality. We
 therefore opted to use a non-parametric alternative to one-way ANOVA.
 
@@ -931,29 +1171,26 @@ ranks) of the groups. Under the null hypothesis $H_0$, all groups share the same
 distribution. If we assume similar spread and shape, this can be interpreted as
 equality of medians (ref!).
 
+    - Comment on Kruskal-Wallis assumptions (independence element can be referenced)
+
 This checks for differences in central tendency across groups and the null
 hypothesis ($H_0$) is that the medians of all 14 groups are equal.
 
 As shown in Table \@ref(tab:kruskal-res), there are no statistically significant
 differences in the typical (central) log-return across the periods
-(p=`r signif(kruskal_res$p.value, 3)`) and we do not have sufficient evidence to
-reject $H_0$. This finding is consistent with the assumption of a constant mean
-(or median) log-return over time.
+(p=`r signif(kruskal_res$p.value, 3)`). We therefore accept the null hypothesis,
+$H_0$, that (!TBI). This finding is consistent with the assumption of a constant
+mean (or median) log-return over time.
+
+```{=latex}
+\newpage
+```
 
 ## Investigation of constant variance {#elementFou}
 
-### Instructions (to be removed later)
+<!-- ### Identifying subsamples with max/min variance (chapter 4 in CS1) -->
 
-_Use the same subsamples as for Element 3. Use a suitable illustration to
-compare the spread of your subsamples. Identify the six-month period with the
-largest sample variance and the six-month period with the smallest sample
-variance. Use bootstrapping/resampling to construct a 95% confidence interval
-for_ $\sigma^2$ for each of these two subsamples separately. Comment on any
-perceived overlap between these intervals.
-
-### Identifying subsamples with max/min variance (chapter 4 in CS1)
-
-```{r Element 4 pt1 - processing}
+```{r Element 4 pt1 - processing, echo=FALSE}
 #--------------- Element 4: investigation of constant variance ----------------#
 variances <- sapply(z_list, var, na.rm = TRUE)
 min_var_loc <- which.min(variances)
@@ -965,7 +1202,9 @@ var_df <- data.frame(
   Variance = as.numeric(variances)
 )
 
-# extract the subsamples as numeric vectors & drop NA
+# !changed to *252: extract the subsamples as numeric vectors & drop NA
+min_var_sample <- na.omit(as.numeric(z_list[[min_var_loc]]))*252
+max_var_sample <- na.omit(as.numeric(z_list[[max_var_loc]]))*252
 min_var_sample <- na.omit(as.numeric(z_list[[min_var_loc]]))
 max_var_sample <- na.omit(as.numeric(z_list[[max_var_loc]]))
 
@@ -987,7 +1226,7 @@ boot_var_max <- boot(
   R         = 5000
 )
 
-# get CI using Bias-Correct and Accelerated interval
+# get CI using Bias-Correct and Accelerated (bca) interval
 # (this adjusts for both bias and skewness in bootstrap distribution)
 var_ci_min_95 <- boot.ci(boot_var_min, type = "bca", conf = 0.95)
 var_ci_max_95 <- boot.ci(boot_var_max, type = "bca", conf = 0.95)
@@ -1032,10 +1271,6 @@ min_period_label <- period_labels[min_var_loc]
 max_period_label <- period_labels[max_var_loc]
 
 ```
-
-The six-month period with the largest sample variance is
-`r names(z_list)[min_var_loc]` and the six-month period with the smallest sample
-variance is `r names(z_list)[max_var_loc]`.
 
 ```{r element4-violin-bar, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Distributions and variability of cleaned log-returns across six-month periods. Top: violin and boxplot summaries of $z_n$ for each period. Bottom: corresponding sample variances $s^2$, highlighting relative differences in spread."}
 # replotting box plot from investigation of constant mean above new variance bar
@@ -1164,7 +1399,7 @@ p_var <- ggplot(var_df, aes(x = Period, y = Variance, fill = Period)) +
   plot_layout(heights = c(1, 1))
 ```
 
-### Bootstrapping confidence intervals for $\sigma^2$
+<!-- ### Bootstrapping confidence intervals for $\sigma^2$ -->
 
 ```{r var-ci, echo=FALSE, message=FALSE, warning=FALSE}
 # Create summary table
@@ -1179,7 +1414,7 @@ var_ci_table <- data.frame(
                 var_ci_max_bca[2])
 )
 
-fmt <- function(x) formatC(x, format = "f", digits = 7)
+fmt <- function(x) formatC(x, format = "f", digits = 6)
 
 var_ci_table_disp <- var_ci_table %>%
   mutate(
@@ -1189,7 +1424,7 @@ var_ci_table_disp <- var_ci_table %>%
   )
 
 kable(
-  var_ci_table_disp,
+  var_ci_table,
   col.names = c(
     "Subsample",
     "Six-month period",
@@ -1200,7 +1435,8 @@ kable(
   booktabs = TRUE,
   align = c("l", "l", "r", "r", "r"),
   escape = FALSE,
-  caption = "Bootstrap BCa 95\\% confidence intervals for the sample variance $s^2$ in the six-month periods with minimum and maximum sample variance."
+  digits = 6,
+  caption = "Bootstrap bias-corrected and accelerated 95\\% confidence intervals for the sample variance $s^2$ in the six-month periods with minimum and maximum sample variance."
 ) %>%
   kable_styling(full_width = FALSE, position = "center")
 
@@ -1214,11 +1450,30 @@ kable(
 #   kable_styling(full_width = FALSE, position = "center")
 ```
 
-### Commenting on overlap
+<!-- ### Commenting on overlap -->
 
-The 95% BCa confidence intervals (CI) for the variance ($\sigma^2$) for each of
-these two subsamples are shown in Table \@ref(tab:var-ci). There is no overlap
-between the 95% CI for the 6-month ranges with the minimum and maximum variance
+### Instructions (to be removed later)
+
+_Use the same subsamples as for Element 3. Use a suitable illustration to
+compare the spread of your subsamples. Identify the six-month period with the
+largest sample variance and the six-month period with the smallest sample
+variance. Use bootstrapping/resampling to construct a 95% confidence interval
+for_ $\sigma^2$ for each of these two subsamples separately. Comment on any
+perceived overlap between these intervals.
+
+### Analysis... (!change)
+
+The six-month period with the largest sample variance is
+`r names(z_list)[min_var_loc]` and the six-month period with the smallest sample
+variance is `r names(z_list)[max_var_loc]`.
+
+!Paragraph here describing the method that we used to address each point we are
+asked about
+
+The 95% bias-corrected and accelerated (BCa) confidence intervals (CI) for the
+variance ($\sigma^2$) for each of these two subsamples are shown in Table
+\@ref(tab:var-ci). There is no overlap between the 95% CI for the 6-month ranges
+with the minimum and maximum variance
 [`r formatC(var_ci_min_bca[1], format = "fg", digits = 4)`,
 `r formatC(var_ci_min_bca[2], format = "fg", digits = 4)`] and
 [`r formatC(var_ci_max_bca[1], format = "fg", digits = 4)`,
@@ -1233,6 +1488,9 @@ maximum variance subsample is
 This finding provides statistical evidence that the true variance $\sigma^2$ is
 not the same in both periods. We have evidence therefore to reject the
 assumption of constant variance in these data.
+
+!BE note: check to see if can make this statement about CI's NOT overlapping.
+Know that have to be careful about the statements made here.
 
 <!-- $\big[`r formatC(var_ci_min_bca[1], format = "fg", digits = 4,small.mark = " ", small.interval = 5L)`, -->
 
@@ -1355,7 +1613,7 @@ log-return $z_n$ is independent of hte distribution of the lagged log-return
 $z_{n-1}$.
 
 The test returns $\chi^2$(\text{df} = `r chisq_result$parameter`) =
-`r formatC(unname(chisq_result$statistic), format = "f", digits = 2)` with p
+`r formatC(unname(chisq_result$statistic), format = "f", digits = 2)` with !p
 `r format.pval(chisq_result$p.value, eps = 0.0001, scientific = FALSE)`
 (p=`r formatC(chisq_result$p.value, format = 'e', digits = 3)`), so we reject
 $H_0$. This provides statistical evidence that $z_n$ is dependent on the
@@ -1393,7 +1651,7 @@ binom.test(num_positive, total_days, p = 0.5, alternative = "greater")
 
 Null hypothesis is that the proportion is 50%.
 
-P-value is below 0.001 (insert values from R) so can reject $H_0$ in favour of
+!P-value is below 0.001 (insert values from R) so can reject $H_0$ in favour of
 alternative hypothesis, which is that the true probability of success is greater
 than 0.5.
 
@@ -1405,7 +1663,7 @@ confirming a general upward bias.
 Test hypothesis that positive runs (consecutive $z_n > 0$) have a longer mean
 duration than negative runs (consecutive $z_n < 0$)
 
-```{r Element 6 pt2 - TBC}
+```{r Element 6 pt2 - persistence of trends}
 #----------------------------- Element 6: part 2 ------------------------------#
 # use run length encoding
 # changing to using z_n_clean_numeric to avoid error
@@ -1433,7 +1691,7 @@ Null hypothesis is that the mean of positive and negative runs are equal.
 Alternative hypothesis is that the mean of positive runs is greater (so one
 tailed).
 
-Wilcoxon rank sum test with continuity correct has p-value \< 0.001 so we have
+Wilcoxon rank sum test with continuity correct has !p-value \< 0.001 so we have
 sufficient evidence to reject the null hypothesis in favour of the alternative
 hypothesis (the positive runs have a shift greater than 0).
 
@@ -1442,9 +1700,9 @@ hypothesis (the positive runs have a shift greater than 0).
 # Conclusions
 
 While the log-normal model was invalidated by the data's non-normality
-(§\@ref(elementOne) & §\@ref(elementTwo)), non-constant variance
-(§\@ref(elementFou)), and lack of independence (§\@ref(elementFiv)), our
-analysis for §\@ref(elementThr) did not find statistical evidence to reject the
+(\S\@ref(elementOne) & \S\@ref(elementTwo)), non-constant variance
+(\S\@ref(elementFou)), and lack of independence (\S\@ref(elementFiv)), our
+analysis for \S\@ref(elementThr) did not find statistical evidence to reject the
 assumption of a constant mean.
 
 To be updated:
@@ -1454,26 +1712,25 @@ time, even as the other core assumptions are violated.
 
 !BE note/summary:
 
-- element 1: Anderson-Darling test provides strong evidence that the $z_n$ data
-  are not normally distributed
-- element 2: bootstrapping with z-data and normal distribution also provides
-  evidence against an assumption of normality
-- element 3: Kruskal–Wallis test -\> we accept null hypothesis that measures of
-  central tendancy of log-returns over six-month periods share the same
-  distribution (/medians are the same?)
-- element 4: 95% BCa confidence intervals do not overlap, providing statistical
-  evidence that (true) variance is not the same in the minimum and maximum
-  six-month periods of sample variable evaluated
-- element 5: Chi-squared test provided evidence that $z_n$ and $z_{n-1}$ are not
-  indendent. BUT haven't checked for $y_{n-1}$ as not sure what this is...
-- element 6:
-  - Part 1: Binomial test revealed proportion of positive-return days is
-    statistically greater than 50% (insert p \<0.001), confirming a general
-    upward bias.
-  - Part 2: Wilcoxon rank sum test with continuity correction provided
-    sufficient statistical evidence (p\<0.001) to reject null hypothesis in
-    favour of alternative hypothesis that the positive runs have a greater
-    mean/median/distribution that the negative runs.
+- element 1 (\S\@ref(elementOne)): Anderson-Darling test provides strong
+  evidence that the $z_n$ data are not normally distributed
+- element 2 (\S\@ref(elementTwo)): bootstrapping with z-data and normal
+  distribution also provides evidence against an assumption of normality
+- element 3 (\S\@ref(elementThr)): Kruskal–Wallis test $\therefore$ we accept
+  null hypothesis that measures of central tendancy of log-returns over
+  six-month periods share the same distribution (/medians are the same?)
+- element 4 (\S\@ref(elementFou)): 95% BCa confidence intervals do not overlap,
+  providing statistical evidence that (true) variance is not the same in the
+  minimum and maximum six-month periods of sample variable evaluated
+- element 5 (\S\@ref(elementFiv)): Chi-squared test provided evidence that $z_n$
+  and $z_{n-1}$ are not indendent. BUT haven't checked for $y_{n-1}$ as not sure
+  what this is...
+- element 6 (\S\@ref(elementSix)): Part 1: Binomial test revealed proportion of
+  positive-return days is statistically greater than 50% (insert p \<0.001),
+  confirming a general upward bias. Part 2: Wilcoxon rank sum test with
+  continuity correction provided sufficient statistical evidence (p\<0.001) to
+  reject null hypothesis in favour of alternative hypothesis that the positive
+  runs have a greater mean/median/distribution that the negative runs.
 
 Want to wrap these up into some sort of formal conclusion...
 
@@ -1485,14 +1742,36 @@ Want to wrap these up into some sort of formal conclusion...
 
 # Appendix
 
+## Accessibility
+
+An accessible HTML version of this report is available via a public GitHub page:
+
+- https://ytterbiu.github.io/a_group07-project
+
+## Methodology for COVID-19 exclusion identification {#apd-COVID19-selection}
+
+Rough notes:
+
+- LU 1 – shows existing pre-COVID up trend
+- LD L1 shows - panic selling induced down trend.
+- 24rd Feb 2020 uptrend shown by line LU1 was breached as shown by point A.
+- This was right after Italy declaring lockdown.
+- 25th Feb 2020 – US CDC Telebriefing indicating mitigating measures.
+- 13 March 2020 – Trump Administration declares nationwide emergency.
+- 23rd March 2020 down trend shown by line LD1 was breached as shown by point B.
+- We can assume the market has absorbed the shock of announcement of COVID-19.
+- Line LU2 Captures on upcoming Uptrend
+
+![changes in the Nasdaq Composite index from x – y.  Analysis was carried out to](fig/appendix-COVID19-selection.pdf)
+
 ## Additional tables and figures
 
-In \@ref(elementThr) the log-returns data were split into six-month periods, as
-shown in Figure \@ref(fig:element3-boxplot).
+In \S\@ref(elementThr) the log-returns data were split into six-month periods,
+as shown in Figure \@ref(fig:element3-boxplot).
 
 ![](fig/element3-boxplot-1.pdf)
 
-```{r days-per-six-month-period, echo=FALSE, message=FALSE, warning=FALSE}
+```{r appendix-setup, echo=FALSE, message=FALSE, warning=FALSE}
 #---------- Appendix: check & count observations in 6-month periods -----------#
 # Count observations in each 6-month period
 days_per_period <- sapply(z_list, NROW)
@@ -1509,7 +1788,9 @@ days_table <- data.frame(
   `Number of data entries` = as.integer(days_per_period),
   check.names = FALSE
 )
+```
 
+```{r days-per-six-month-period, echo=FALSE, message=FALSE, warning=FALSE}
 kable(
   days_table,
   col.names = c(
@@ -1519,20 +1800,21 @@ kable(
   ),
   caption = "Number of non-missing log-return observations in each six-month period.",
   booktabs = TRUE,
+  longtable = TRUE,
   align = c("r","r", "c")
 ) |>
   kable_styling(
     full_width = FALSE,
-    position = "center",
-    latex_options = "hold_position"
+    position = "center"
   )
 ```
 
-## R Code Documentation
+<!-- BE note: taken out as we are submitting R file separately -->
+<!-- Use: `knitr::purl("cs1-group07.rmd")` to generate r file -->
+<!-- ## R Code Documentation -->
+<!-- ```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
 
-```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
-
-```
+``` -->
 
 ## Generative AI Declaration
 
@@ -1560,9 +1842,11 @@ plotting issues (& are similar to querying with a traditional search engine).
   Can this be fixed for the plot area?"
 - "Help phrasing this in a simple and accessible way - remove any jargon &
   identify the key points"
+- "How can this error be tracked down in an rmd file? ! Text line contains an
+  invalid character. l.1 ^^@^^@..."
 - ...
 
-### Use of GenAI output
+### Use of GenAI outputs & subsequent revisions
 
 The GenAI tools served as a additional group member. Notably, the GenAI output:
 
@@ -1573,9 +1857,9 @@ The GenAI tools served as a additional group member. Notably, the GenAI output:
   where the assumptions of parametric tests (ANOVA, t-test) were violated.
 - Recommended specific R packages (nortest, e1071) and functions (ad.test,
   kruskal.test) best suited for each task.
-- Commented on the structure for the R code and the final report narrative.
+- Commented on the structure of R code snippets and the report structure.
 
-### Changes made following GenAI use:
+### Changes made:
 
 The AI's suggestions were critically reviewed and debated by the group. Plotting
 formatting in ggplot, ... (add others) and... were all implemented following an
@@ -1588,16 +1872,12 @@ final analysis, interpretation, and writing in this report were generated by
 
 ---
 
-```
-
-```
-
 [^log-symmetry]:
-    With simple percentages, a 100% gain (+100%) is not cancelled out by a 100%
-    loss (−100%). It's cancelled out by a 50% loss (−50%). This asymmetry makes
-    statistical modeling difficult. With log-returns, a move from $100 to $200
-    (a log-return of +0.693) is the exact mathematical opposite of a move from
-    $200 to $100 (a log-return of −0.693).
+    With simple percentages a 100% gain (+100%) is cancelled out by a 50% loss
+    (−50%), not a 100% loss (−100%). This asymmetry makes statistical modeling
+    difficult. With log-returns, a move from $100 to $200 (a log-return of
+    +0.693) is the exact mathematical opposite of a move from $200 to $100 (a
+    log-return of −0.693).
 
 [^cont2001quote]:
     Where a 'stylized empirical fact' was defined as being "properties common

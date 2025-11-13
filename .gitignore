@@ -16,8 +16,18 @@
 *.tex
 *.css
 *.xlsx
+*.doc*
 
 # files
 cs1-group07.fdb_latexmk
 cs1-group07.aux
 cs1-group07.log
+cs1-group07.synctex.gz
+cs1-group07.bbl
+cs1-group07.fls
+cs1-group07.toc
+cs1-group07.xdv
+cs1-group07.blg
+
+# cached files
+/cs1-group07_cache/*
