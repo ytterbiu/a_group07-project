@@ -39,7 +39,7 @@ bibliography: references.bib
 
 ## Executive summary
 
-Summary / Abstract TBI here
+Summary / Abstract TBI here...
 
 ```{=html}
 <!-- ## Key Information
