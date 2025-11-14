@@ -39,31 +39,7 @@ bibliography: references.bib
 
 ## Executive summary
 
-Summary / Abstract here
-
-Key points (BE clarified with Russell)
-
-- Write for actuarial supervisor (boss, but who understands statistics)
-
-- Give p-values to 2dp if \>0.01, 3dp if \<0.01 and if below 0.001 then write
-  \<0.001. (BE note: make custom function for in text R functionality)
-
-- These assumptions are used because they are mathematically convenient, not
-  necessarily because they are true... This is known
-
-- Don't have to include a load of references, but no harm
-
-- For COVID data need to include data driven justification for the range of
-  dates chosen... This is a good point to include a reference or some kind of
-  metric
-
-- For each statistical test used, Russell wants to see that we know the
-  conditions for its use (where it can and can't be used and why it's
-  appropriate for use in the case we are discussing).
-
-- Gamma 1 is the skewness and gamma 2 is the kurtosis so double gamma 1's are
-  appropriate in element 2. If wanting to label separately then would use gamma
-  1 x and gamma 1 y (etc.)
+Summary / Abstract TBI here
 
 ```{=html}
 <!-- ## Key Information
@@ -183,6 +159,13 @@ format_p_vals <- function(p) {
 
 ```{r Download-data, include=FALSE}
 #---------------------------- Download / Load data ----------------------------#
+# Daily adjusted closing values for ^IXIC over the period 1 January 2018 to 31
+# December 2024 were extracted using `getSymbols` from the `quantmod` package.
+# These data were then used as the basis for our statistical evaluation in this
+# report.
+# We prepared the data by getting the adjusted close price, applying a log
+# transform, calculating the log-return increment, and removing NaN values.
+#
 # Define inputs & date range
 ticker <- "^IXIC"
 from   <- as.Date("2018-01-01")
@@ -273,35 +256,56 @@ z_n <- na.omit(z_n)
 - (from above: https://indexes.nasdaqomx.com/docs/FS_COMP.pdf
   https://indexes.nasdaqomx.com/docs/methodology_comp.pdf)
 
-This report analyses the Nasdaq Composite Index (`^IXIC`) using data from
-January 1, 2018, to December 31, 2024. The Nasdaq Composite Index a stock market
-index that includes thousands of stocks listed on the Nasdaq exchange. It's
-heavily focused on technology companies and is widely used as a key benchmark
-for the tech sector's performance. As a result, this index's behaviour can
-impact many financial products (including index-tracking funds).
+<!-- This report analyses the Nasdaq Composite Index (`^IXIC`) using data from -->
+<!-- January 1, 2018, to December 31, 2024.  -->
 
-The adjusted closing price was analysed because, unlike the regular closing
-price, it accounts for corporate actions like dividends and stock splits. This
-gives a much more accurate picture of an investor's actual returns.
+The Nasdaq Composite Index (Nasdaq) is a stock market index that includes
+thousands of stocks listed on the Nasdaq exchange (!ref). It is heavily focused
+on technology companies, widely used as a key benchmark for the tech sector's
+performance, and the index’s behaviour can impact many financial products,
+including index-tracking funds (!refs).
 
-The log-returns were calculated from the raw US dollar prices. This metric (BE
-note: is metric the correct word?) measures the daily change in a way that is
-time-additive (meaning daily log-returns sum up to the total log-return for the
-week) and mathematically symmetric (!refs)[^log-symmetry]. This symmetry makes
-log-returns a more suitable method of evaluating an index's volatility and
-day-to-day movements. The data were cleaned and any missing values were removed
-(further data cleaning is described in \S\@ref(elementOne)). The historical
-price of the index and its daily log-returns for 2018-2024 are shown in Figure
-\@ref(fig:initial-visualisation).
+In the standard asset-pricing model that underpins much of mathematical finance,
+the log-price of an asset evolves according to Equation \@ref(eq:zn),
 
-<!-- Daily adjusted closing values for ^IXIC over the period 1 January 2018 to 31 -->
-<!-- December 2024 were extracted from ... using `getSymbols` from the `quantmod` -->
-<!-- package. These data were then used as the basis for our statistical evaluation -->
-<!-- in this report. Used adjusted closing because -->
-<!-- First we can prepare our data, getting the adjusted close price, applying a log -->
-<!-- transform, calculating the log-return increment, and removing NaN values. -->
-<!-- The Nasdaq Composite Index over the period 1 January 2018 to 31 December 2024, -->
-<!-- and the log-return increment are shown in \@ref(fig:initial-visualisation). -->
+\begin{equation}
+  \log X_{n} = \log X_{n-1} + Z_{n} 
+  (\#eq:zn)
+\end{equation}
+
+<!-- $$ -->
+<!-- \log X_{n} = \log X_{n-1} + Z_{n}  -->
+<!-- (\#eq:zn) -->
+<!-- $$ -->
+
+where the log-returns $Z_n$ are assumed to be normally distributed with constant
+mean $\mu$, variance $\sigma^{2}$, and are independent over time. This project
+uses the Nasdaq as a case study to assess how well these four assumptions
+(normality, constant mean, constant variance, and independence of daily
+log-returns) hold in practice.
+
+The adjusted Nasdaq closing price was analysed because it accounts for corporate
+actions like dividends and stock splits, giving a more accurate picture of an
+investor’s actual returns. Daily log-returns were calculated from the adjusted
+closing price. This measure captures day-to-day changes in a way that is
+time-additive (daily log-returns sum to the total log-return over a week) and
+mathematically symmetric (!refs)[^log-symmetry]. This symmetry makes log-returns
+a convenient way to evaluate the index’s volatility and day-to-day movements.
+
+```{=latex}
+\newpage
+```
+
+# Individual elements
+
+## Data cleaning and standard test of normality {#elementOne}
+
+### Identifying and removing outliers
+
+Moved this down: might delete... The data were cleaned and any missing values
+were removed (further data cleaning is described in \S\@ref(elementOne)). The
+historical price of the index and its daily log-returns for 2018-2024 are shown
+in Figure \@ref(fig:initial-visualisation).
 
 ```{r initial-visualisation, fig.cap = "Nasdaq Composite price trend and daily volatility (2018–2024). The left figure shows the daily adjusted closing price. The right figure shows the daily log-returns, highlighting day-to-day percentage changes and volitility.", echo = FALSE}
 # same length as IXIC_ad, first value NA
@@ -322,8 +326,7 @@ p1_initial_vis <- ggplot(df_initial_ixic, aes(date, price)) +
   labs(
     title = "NASDAQ Composite\n (Adjusted Close)",
     x = "Date",
-    y = "Adjusted
-Close"
+    y = "Adjusted Close ($)"
   )
 
 p2_initial_vis <- ggplot(df_initial_ixic, aes(date, z_n)) +
@@ -343,21 +346,16 @@ p2_initial_vis <- ggplot(df_initial_ixic, aes(date, z_n)) +
   )
 ```
 
-# Individual elements
-
-## Data cleaning and standard test of normality {#elementOne}
-
-### Identifying and removing outliers
-
 A review of the Nasdaq Composite adjusted closing price over 2018-2024 was
 undertaken to identify and extract the dates of periods of elevated volatility.
 Potential outliers were considered for exclusion if the volatility did not arise
 from legitimate market activity. A timeline showing regions of volatility and
 their primary attributable causes are shown in Figure !x. Following numerical
 analysis (!describe) and group discussion, only one period associated with onset
-of the COVID-19 pandemic was selected for exclusion. The data driven procedure
-used to define the COVID-19 exclusion window is described in more detail in the
-appendix (\S\@ref(apd-COVID19-selection)).
+of the COVID-19 pandemic was selected for exclusion (Figure
+\@ref(fig:regions-to-be-removed)). The data driven procedure used to define the
+COVID-19 exclusion window is described in the appendix
+(\S\@ref(apd-COVID19-selection)).
 
 We acknowledge that what constitutes “legitimate” market activity is itself
 debatable. One could potentially exclude other volatile periods, but doing so
@@ -401,13 +399,6 @@ z_n_clean_pre_na_drop <- z_n_clean
 z_n_clean <- na.omit(z_n_clean)
 ```
 
-New visualisation to show where the periods to remove are... We will probably
-also want to put these in a table? Or could describe in text - don't feel
-strongly either way.
-
-!BE note: having made Figure \@ref(fig:regions-to-be-removed), think this figure
-combined with an intext description will be best.
-
 ```{r regions-to-be-removed, echo = FALSE, fig.cap = "Initial visualisation and regions selected for removal"}
 outlier_df <- tibble(
   id     = seq_along(outlier_periods_to_remove),
@@ -448,7 +439,7 @@ p1 <- ggplot(df, aes(date, price)) +
   geom_line() +
   labs(
     title = "NASDAQ Composite\n(Adjusted Close)",
-    x = "Date", y = "Adjusted Close"
+    x = "Date", y = "Adjusted Close ($)"
   ) +
   base_theme +
   # vertical dotted lines
@@ -771,7 +762,7 @@ outcome of your tests confirms the result of the test of normality.
 
 Idea: compare the sampling distribution of skewness from the data against the
 sampling distribution of skewness from a true normal distribution, using the
-parameters from IXIC data.
+parameters from `IXIC` data.
 
 We are told to use a small n ($n=13$) so would expect non-normal despite
 underlying data being normal.
@@ -1272,7 +1263,7 @@ max_period_label <- period_labels[max_var_loc]
 
 ```
 
-```{r element4-violin-bar, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Distributions and variability of cleaned log-returns across six-month periods. Top: violin and boxplot summaries of $z_n$ for each period. Bottom: corresponding sample variances $s^2$, highlighting relative differences in spread."}
+```{r element4-box-bar, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Distributions and variability of cleaned log-returns across six-month periods. Top: violin and boxplot summaries of $z_n$ for each period. Bottom: corresponding sample variances $s^2$, highlighting relative differences in spread."}
 # replotting box plot from investigation of constant mean above new variance bar
 # chart
 
@@ -1316,38 +1307,11 @@ p_var_el4 <- ggplot(var_df, aes(x = Period, y = Variance, fill = Period)) +
   )
 
 # Stack vertically with aligned x-axis
-library(patchwork)
 (p_box_el4 / p_var_el4) +
   plot_layout(heights = c(1, 1))
 ```
 
-```{r element4-box-bar, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Distributions and variability of cleaned log-returns across six-month periods. Top: boxplot summaries of $z_n$ for each period. Bottom: corresponding sample variances $s^2$, highlighting relative differences in spread."}
-# # Violin + boxplot for spread/shape
-# p_violin <- ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
-#   geom_violin(trim = FALSE, fill = NA, colour = "grey40") +
-#   geom_boxplot(width = 0.08, outlier.size = 0.5) +
-#   theme_bw() +
-#   labs(
-#     title = "Distribution of log-returns across six-month periods",
-#     x = NULL,
-#     y = expression(z[n])
-#   ) +
-#   theme(
-#     axis.text.x = element_blank(),  # hide x labels here
-#     axis.ticks.x = element_blank()
-#   )
-
-# # Bar chart of sample variances
-# p_var <- ggplot(var_df, aes(x = Period, y = Variance)) +
-#   geom_col() +
-#   theme_bw() +
-#   labs(
-#     title = "Sample variance of log-returns by six-month period",
-#     x = "Six-month period",
-#     y = expression(s^2)
-#   ) +
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-#
+```{r element4-vio-bar, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Distributions and variability of cleaned log-returns across six-month periods. Top: boxplot summaries of $z_n$ for each period. Bottom: corresponding sample variances $s^2$, highlighting relative differences in spread."}
 
 p_violin <- ggplot(combined_df_el3, aes(x = Period, y = z_value, fill = Period)) +
   geom_violin(trim = TRUE, colour = "grey20", alpha = 0.4) +
@@ -1450,6 +1414,77 @@ kable(
 #   kable_styling(full_width = FALSE, position = "center")
 ```
 
+```{r testing-anualised-data}
+# Daily variance per period, then annualise
+variances_daily <- sapply(z_list, var, na.rm = TRUE)
+variances_ann   <- variances_daily * 252
+
+min_var_loc <- which.min(variances_ann)
+max_var_loc <- which.max(variances_ann)
+
+# Period labels
+start_dates <- as.Date(sapply(z_list, function(x) index(x)[1]))
+last_dates  <- as.Date(sapply(z_list, function(x) index(x)[NROW(x)]))
+end_dates   <- c(start_dates[-1] - 1, last_dates[length(last_dates)])
+
+period_labels <- paste(
+  base::format(start_dates, "%b %Y"), "-",
+  base::format(end_dates,  "%b %Y")
+)
+
+# min/max periods (still daily reforms)
+min_var_sample <- na.omit(as.numeric(z_list[[min_var_loc]]))
+max_var_sample <- na.omit(as.numeric(z_list[[max_var_loc]]))
+
+# multiply bu 252
+var_ann_stat <- function(x, idx) var(x[idx]) * 252
+
+# iid bootstrap
+boot_min <- boot(data = min_var_sample, statistic = var_ann_stat, R = 5000)
+boot_max <- boot(data = max_var_sample, statistic = var_ann_stat, R = 5000)
+
+# BCa 95% CIs 
+ci_min_95 <- boot.ci(boot_min, type = "bca", conf = 0.95)$bca[4:5]
+ci_max_95 <- boot.ci(boot_max, type = "bca", conf = 0.95)$bca[4:5]
+
+# annualised point estimates
+s2_min_ann <- var(min_var_sample) * 252
+s2_max_ann <- var(max_var_sample) * 252
+
+min_period_label <- period_labels[min_var_loc]
+max_period_label <- period_labels[max_var_loc]
+
+var_ci_table <- data.frame(
+  Subsample = c("Min variance", "Max variance"),
+  Period    = c(min_period_label, max_period_label),
+  s2        = c(s2_min_ann, s2_max_ann),
+  CI_lower  = c(ci_min_95[1], ci_max_95[1]),
+  CI_upper  = c(ci_min_95[2], ci_max_95[2])
+)
+
+fmt <- function(x) formatC(x, format = "f", digits = 6)
+
+var_ci_table_disp <- var_ci_table |>
+  dplyr::mutate(
+    s2       = paste0("$", fmt(s2), "$"),
+    CI_lower = paste0("$", fmt(CI_lower), "$"),
+    CI_upper = paste0("$", fmt(CI_upper), "$")
+  )
+
+kable(
+  var_ci_table,
+  col.names = c("Subsample", "Six-month period",
+                "Annualised variance $s^2$ (×252)",
+                "95\\% CI lower", "95\\% CI upper"),
+  booktabs = TRUE, 
+  align = c("l","l","r","r","r"),
+  escape = FALSE, 
+  digits = 3,
+  caption = "BCa 95\\% confidence intervals for annualised variance in the six-month periods with minimum and maximum variance."
+) |>
+  kable_styling(full_width = FALSE, position = "center")
+```
+
 <!-- ### Commenting on overlap -->
 
 ### Instructions (to be removed later)
@@ -1462,6 +1497,20 @@ for_ $\sigma^2$ for each of these two subsamples separately. Comment on any
 perceived overlap between these intervals.
 
 ### Analysis... (!change)
+
+!BE note: scaling 6-month volatility/variance estimates to an annual basis so 
+the numbers are easier to interpret and comparable (~126 trading days per 6M).
+Have assumed the following:
+
+$$
+\hat{\mu}_{\text{annual}} = \hat{\mu}_{\text{daily}} \times 252
+$$
+$$
+\hat{\sigma}_{\text{annual}}^2 = \hat{\sigma}_{\text{daily}}^2 \times 252
+$$
+$$
+\hat{\sigma}_{\text{annual}} = \hat{\sigma}_{\text{daily}} \times \sqrt{252}
+$$
 
 The six-month period with the largest sample variance is
 `r names(z_list)[min_var_loc]` and the six-month period with the smallest sample
@@ -1634,37 +1683,15 @@ days when $Z_i < 0$. (Note that a run may only be one day in length, or may be
 longer than one day.) Identify the runs in your data set and test whether
 positive runs have longer mean duration than negative runs.
 
-### Proportion of positive increments
-
-Want to test whether proportion is \>0.5 (i.e., occurs over 50% of the time).
-
-```{r Element 6 pt1 - proportion of positive increments}
+```{r Element 6 - proportion of positive increments}
 #------------------- Element 6: general upwardness of trend -------------------#
 num_positive <- sum(z_n_clean > 0)
 total_days <- length(z_n_clean)
 # test using binomial (could also approximate, but Russell normally says
 # 'why approximate when you can calculate' so opted for that here)
-binom.test(num_positive, total_days, p = 0.5, alternative = "greater")
-```
+binom_res <- binom.test(num_positive, total_days, p = 0.5, alternative = "greater")
 
-(Assuming this code is valid, but this seems too easy so please check)
-
-Null hypothesis is that the proportion is 50%.
-
-!P-value is below 0.001 (insert values from R) so can reject $H_0$ in favour of
-alternative hypothesis, which is that the true probability of success is greater
-than 0.5.
-
-The proportion of positive-return days is statistically greater than 50%,
-confirming a general upward bias.
-
-### Persistence of trends
-
-Test hypothesis that positive runs (consecutive $z_n > 0$) have a longer mean
-duration than negative runs (consecutive $z_n < 0$)
-
-```{r Element 6 pt2 - persistence of trends}
-#----------------------------- Element 6: part 2 ------------------------------#
+#------------------- Element 6: persistence of trends
 # use run length encoding
 # changing to using z_n_clean_numeric to avoid error
 # 'rle(signs) : 'x' must be a vector of an atomic type'
@@ -1676,26 +1703,72 @@ runs <- rle(signs)
 pos_run_lengths <- runs$lengths[runs$values == 1]
 neg_run_lengths <- runs$lengths[runs$values == -1]
 
-mean(pos_run_lengths)
-mean(neg_run_lengths)
+mean_pos_run <- mean(pos_run_lengths)
+mean_neg_run <- mean(neg_run_lengths)
 
 # could use t-test, but unlikely these are normally distributed
 # non-parametric alternative is Mann-Whitney test (/Wilcoxon Rank-Sum)
 # -> want to compare distributions of two groups without assuming normality
 # Onesided here I think
 
-wilcox.test(pos_run_lengths, neg_run_lengths, alternative = "greater")
+wilcox_res <- wilcox.test(pos_run_lengths, neg_run_lengths, alternative = "greater")
 ```
 
-Null hypothesis is that the mean of positive and negative runs are equal.
-Alternative hypothesis is that the mean of positive runs is greater (so one
-tailed).
+### Proportion of positive increments
 
-Wilcoxon rank sum test with continuity correct has !p-value \< 0.001 so we have
-sufficient evidence to reject the null hypothesis in favour of the alternative
-hypothesis (the positive runs have a shift greater than 0).
+The proportion of days with a positive log-return is
+`r formatC(num_positive / total_days, format = "fg", digits = 4)`.
 
-!BE note: want to include the values from R in the text again.
+A one tailed binomial test was used to calculate the probability of this
+occurring assuming a null hypothesis, $H_0$, of $p=0.5$ ($H_1: \; p>0.5$)
+
+The exact binomial test assumes:
+
+- Each day is classified as a binary outcome (success = positive return, failure
+  = non-positive return).
+- The sequence of days can be treated as approximately independent Bernoulli
+  trials.
+- The success probability p is constant over the period.
+- The number of trials is fixed in advance.
+
+These conditions are met here, however for financial data the independence and
+constant- p assumptions are only approximate (because of possible serial
+dependence and time-varying volatility). The test is still a reasonable first
+descriptive check for the 'upwardness' of the index.
+
+The binomial test found p `r format_p_vals(binom_res$p.value)` so we reject
+$H_0$ in favour of alternative hypothesis that the true proportion of days with
+positive increments is greater than 0.5. This confirms a general upward bias.
+
+### Persistence of trends
+
+A second question is whether upward movements tend to persist longer than
+downward movements. Test hypothesis that positive runs (consecutive $z_n > 0$)
+have a longer mean duration than negative runs (consecutive $z_n < 0$)
+
+The mean length of positive runs is
+`r formatC(mean_pos_run, format = "fg", digits = 3)` days, compared with
+`r formatC(mean_neg_run, format = "fg", digits = 3)` days for negative runs.
+
+A one-sided Mann-Whitney test (or Wilcoxon Rank-Sum test) was used with the null
+hypothesis, $H_0$, that the mean of positive and negative runs are equal and an
+alternative hypothesis that the mean of positive runs is greater than negative
+runs.
+
+The Mann–Whitney / Wilcoxon rank-sum test assumes:
+
+- Two independent samples (here, the set of positive-run lengths and the set of
+  negative-run lengths).
+- The response is ordinal (run lengths are counts of days).
+- Under $H_0$ the two populations have the same distribution.
+
+<!-- Run lengths are discrete and may not be perfectly independent in a strict time-series sense, but the test is robust to moderate deviations from these assumptions. Because run lengths are non-negative integers and can be skewed, a non-parametric test is more appropriate than a two-sample  -->
+<!-- t-test, which would require approximate normality of run lengths in each group. -->
+
+Wilcoxon rank sum test with continuity correct found p
+`r format_p_vals(wilcox_res$p.value)` so we have sufficient evidence to reject
+the null hypothesis in favour of the alternative hypothesis (the positive runs
+have a shift greater than 0).
 
 # Conclusions
 
@@ -1742,11 +1815,18 @@ Want to wrap these up into some sort of formal conclusion...
 
 # Appendix
 
-## Accessibility
+## Accessibility and reproducability
 
 An accessible HTML version of this report is available via a public GitHub page:
 
 - https://ytterbiu.github.io/a_group07-project
+
+This report was created in R Markdown. The source code is open source and is
+available via https://github.com/ytterbiu/a_group07-project/tree/main. Changes
+made to this document were tracked using Git and are also available via the same
+repository (https://github.com/ytterbiu/a_group07-project/commits/main/). Please
+note that this commit history reflects updates made to the project respository
+and is not a comprehensive timeline of all contributions by all group members.
 
 ## Methodology for COVID-19 exclusion identification {#apd-COVID19-selection}
 
@@ -1822,8 +1902,9 @@ kable(
 
 ## Generative AI Declaration
 
-Generative AI tools were used to assist with project planning and methodological
-validation throughout this project.
+Generative AI (GenAI) tools were used to assist with project planning,
+methodological validation, and R debugging throughout this project. The GenAI
+tools served as a additional group member in this capacity.
 
 ### Tools Used
 
@@ -1834,16 +1915,16 @@ Google Gemini 2.5 Pro (Deep Research), ChatGPT 5
 The GenAI tools were provided with the 'Coursework Group 7.pdf' and extracts
 from our R code.
 
-A non-exhaustive list of prompts/queries used is shown below. We opted to
-include at least one example of each _type_ of query used, rather than including
-all queries used. For example, if we entered the prompts/queries 'How can we put
-two ggplots side by side?' and 'How to remove grey background on a ggplot', we
-would only include the first of these in the list below, as both relate to
-plotting issues (& are similar to querying with a traditional search engine).
+A non-exhaustive list of prompts used is shown below. We opted to include at
+least one example of each _type_ of prompt used, rather than a list of all
+prompts. For example, if we entered the prompts 'How can we put two ggplots side
+by side?' and 'How to remove grey background on a ggplot', we would include only
+the first of these in the list below, as both relate to plotting issues (& are
+similar to 'querying' with a traditional search engine).
 
 - "Can you help with outlining the steps for this project."
-- "...the top of both graphs in r are slightly different. (Pasting in R code.)
-  Can this be fixed for the plot area?"
+- "...the top of both graphs in r are slightly different. (Pasting R code.) Can
+  this be fixed for the plot area?"
 - "Help phrasing this in a simple and accessible way - remove any jargon &
   identify the key points"
 - "How can this error be tracked down in an rmd file? ! Text line contains an
