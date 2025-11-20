@@ -14,6 +14,9 @@
 .RData
 .Rhistory
 *.tex
+*.aux
+*.log
+*.synctex*
 *.css
 *.xlsx
 *.doc*
@@ -31,3 +34,5 @@ cs1-group07.blg
 
 # cached files
 /cs1-group07_cache/*
+251119-cs1-group07.rmd
+figure-testing.R
