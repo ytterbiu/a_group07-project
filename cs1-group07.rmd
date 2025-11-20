@@ -339,7 +339,7 @@ Equation \@ref(eq:zn),
 where $Z_n = \log(X_n / X_{n-1})$ denotes the daily log-return. Consistent with 
 the properties of Wiener processes, the log-returns
 $Z_n$ are assumed to be normally distributed with constant mean $\mu$, variance
-$\sigma^{2}$, and are independent over time. This project uses the Nasdaq as a
+$\sigma^{2}$, and are independent over time. This report uses the Nasdaq as a
 case study to assess how well these four assumptions (normality, constant mean,
 constant variance, and independence) hold in practice.
 
@@ -629,6 +629,159 @@ p_clean <- ggplot(df_clean, aes(date, z_n)) +
 
 ```
 
+```{r Element 1 pt2, echo = FALSE}
+#----------------------------- Element 1 - Table ------------------------------#
+# Skewness and excess kurtosis of the cleaned log-returns $z_n$ were computed
+# using the `e1071` package in R with type = 1 [@R-e1071]. This corresponds to
+# the classical moment-based definitions $m_3/m_2^{3/2}$ and $m_4/m_2{^2} - 3$
+# described by @joanes1998, and used in SMM047 2025-26
+# [@gerrard_seg2_notes_questions]. These measures are widely used in textbooks
+# and provide a direct description of the shape of the empirical distribution.
+# Alternative implementations, such as the package `summarytools`, were
+# considered. This includes applying a apply small-sample bias corrections
+# (“type 3” estimators), which lead to slightly different values but are
+# asymptotically equivalent. Given our relatively large sample size and
+# descriptive aim, the type 1 definitions are appropriate and fully adequate.
+
+# e1071::skewness(z_n_clean, type = 1)
+z_n_clean_numeric <- as.numeric(z_n_clean)
+
+z_n_mean <- mean(z_n_clean_numeric)
+z_n_vari <- var(z_n_clean_numeric)
+z_n_skew <- e1071::skewness(z_n_clean_numeric, type = 1)
+z_n_kurt <- e1071::kurtosis(z_n_clean_numeric, type = 1)
+
+desc_z_n_clean <- tibble(
+  Statistic = c(
+    "Sample Mean",
+    "Sample Variance",
+    "Skewness",
+    "Excess Kurtosis"
+  ),
+  Value = c(
+    z_n_mean,
+    z_n_vari,
+    z_n_skew,
+    z_n_kurt
+  )
+) |>
+  mutate(Value = sprintf("%.6f", Value))
+```
+
+```{r zn-desc, echo=FALSE, message=FALSE, warning=FALSE}
+kable(
+  desc_z_n_clean,
+  # caption = "Descriptive statistics of cleaned log returns ($z_n$).",
+  caption = paste0(
+    "Descriptive statistics of cleaned Nasdaq log returns (n = ", 
+    format(length(z_n_clean), big.mark = ","), 
+    "). Skewness and kurtosis were calculated using Type 1 estimators. Given the large sample size, differences compared to bias-corrected (Type 2 or 3) estimators are negligible."
+  ),
+  booktabs = TRUE,
+  align = c("l", "r"),
+  escape = FALSE
+) |>
+  kable_styling(
+      full_width = FALSE, 
+      position = "center", 
+      latex_options = "hold_position"
+    )
+```
+
+```{r zn-desc-ad, echo=FALSE, message=FALSE, warning=FALSE, include = FALSE}
+#- Element 1 - (bonus) Table with type 2 & 3 estimators (not used in report) --#
+# BE note: changed to include = FALSE on 19/11/2025
+z_n_clean_numeric <- as.numeric(z_n_clean)
+
+desc_ad <- tibble(
+  Statistic = c(
+    "Sample Mean",
+    "Sample Variance",
+    "Skewness (Type 1)",
+    "Skewness (Type 2)",
+    "Skewness (Type 3)",
+    "Excess Kurtosis (Type 1)",
+    "Excess Kurtosis (Type 2)",
+    "Excess Kurtosis (Type 3)"
+  ),
+  Value = c(
+    mean(z_n_clean_numeric),
+    var(z_n_clean_numeric),
+    e1071::skewness(z_n_clean_numeric, type = 1),
+    e1071::skewness(z_n_clean_numeric, type = 2),
+    e1071::skewness(z_n_clean_numeric, type = 3),
+    # already excess kurtosis for type = 1
+    e1071::kurtosis(z_n_clean_numeric, type = 1),
+    e1071::kurtosis(z_n_clean_numeric, type = 2),
+    e1071::kurtosis(z_n_clean_numeric, type = 3)
+  )
+) |>
+  mutate(Value = sprintf("%.6f", Value))
+kable(
+  desc_ad,
+  caption = "Additional descriptive statistics of cleaned log returns ($z_n$).",
+  booktabs = TRUE,
+  align = c("l", "r"),
+  escape = FALSE
+) |>
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+
+```{r Test of normality, echo=FALSE, include = FALSE}
+ad_test_result <- ad.test(z_n_clean)
+ad_test_result
+```
+
+Nasdaq Composite adjusted closing prices (2018–2024) were reviewed to identify
+periods of volatility unrelated to legitimate market activity (Figure
+\@ref(fig:timeline-fig)).[^legit-market] Following numerical analysis and
+qualitative review, only the onset of the COVID-19 pandemic was excluded as a
+non-representative outlier. Figure
+\@ref(fig:initial-data-visualisation-volatility-and-regions-to-remove) shows the
+Nasdaq adjusted close over this period and the period selected for exclusion.
+Further details on the COVID-19 exclusion window are discussed in Appendix
+\S\@ref(apd-COVID19-selection).
+
+As shown in Table \@ref(tab:zn-desc), the resulting daily log-returns ($Z_n$) 
+exhibit significant excess kurtosis
+($\gamma_2$= `r formatC(e1071::kurtosis(z_n_clean_numeric, type = 1), format = "fg", digits = 3)`). 
+This leptokurtic behavior is consistent with the "stylized empirical facts" of 
+financial time series described by @Cont01022001 and early findings by 
+@Mandelbrot1963.[^cont2001quote]
+
+Given the heavy-tailed nature of the data, the Anderson–Darling test was
+selected to assess normality. The Anderson–Darling test is preferable to
+alternatives, such as the Kolmogorov–Smirnov test, due to its increased
+sensitivity to deviations in the tails of the distribution. The hypotheses are
+defined as:
+
+$$
+\begin{cases}
+H_0: Z_n \text{ is drawn from a normal distribution}\\
+H_1: Z_n \text{ is not drawn from a normal distribution}
+\end{cases}
+$$
+
+Alternative notation
+$$
+\begin{cases}
+H_0: Z_n \sim {N}(\mu, \sigma^2) & \text{(data are normally distributed)} \\
+H_1: Z_n \nsim {N}(\mu, \sigma^2) & \text{(data are not normally distributed)}
+\end{cases}
+$$
+
+The test statistic was A= `r round(ad_test_result$statistic, 1)` 
+(p `r format_p_vals(ad_test_result$p.value)`). We therefore reject the null
+hypothesis ($H_0$). The Anderson-Darling test provides strong evidence that the 
+Nasdaq log-returns are not normally distributed.
+
+
+```{r timeline-fig, echo=FALSE, fig.cap="Nasdaq Periods from 2018-2024 reviewed as potential outliers for this report.", out.width="80%", fig.align='center', out.width="100%",}
+knitr::include_graphics("fig/timeline2.pdf")
+```
+
+
 ```{r initial-data-visualisation-volatility-and-regions-to-remove, eval = TRUE, echo = FALSE, fig.width=6, fig.height=7.0, fig.cap = "Nasdaq Composite price and volatility, 2018–2024. From top to bottom: (i) daily adjusted closing price; (ii) daily log-return increments; (iii) 60-day rolling volatility, measured as the standard deviation of daily log-returns over a 60-trading-day rolling window; and (iv) daily log-return increments after excluding high-volatility outlier periods.", fig.pos='!ht'}
 #------------ Element 1 - Figure showing data pre & post-exclusion ------------#
 trading_period_days <- 60
@@ -800,152 +953,6 @@ initial_vis_p4 <- ggplot(df_clean, aes(date, z_n)) +
 (initial_vis_p1 / initial_vis_p3 / initial_vis_p2 / initial_vis_p4)
 ```
 
-```{r timeline-fig, echo=FALSE, fig.cap="Nasdaq Periods from 2018-2024 reviewed as potential outliers for this report.", out.width="80%", fig.align='center', out.width="100%",}
-knitr::include_graphics("fig/timeline2.pdf")
-```
-
-```{r Element 1 pt2, echo = FALSE}
-#----------------------------- Element 1 - Table ------------------------------#
-# Skewness and excess kurtosis of the cleaned log-returns $z_n$ were computed
-# using the `e1071` package in R with type = 1 [@R-e1071]. This corresponds to
-# the classical moment-based definitions $m_3/m_2^{3/2}$ and $m_4/m_2{^2} - 3$
-# described by @joanes1998, and used in SMM047 2025-26
-# [@gerrard_seg2_notes_questions]. These measures are widely used in textbooks
-# and provide a direct description of the shape of the empirical distribution.
-# Alternative implementations, such as the package `summarytools`, were
-# considered. This includes applying a apply small-sample bias corrections
-# (“type 3” estimators), which lead to slightly different values but are
-# asymptotically equivalent. Given our relatively large sample size and
-# descriptive aim, the type 1 definitions are appropriate and fully adequate.
-
-# e1071::skewness(z_n_clean, type = 1)
-z_n_clean_numeric <- as.numeric(z_n_clean)
-
-z_n_mean <- mean(z_n_clean_numeric)
-z_n_vari <- var(z_n_clean_numeric)
-z_n_skew <- e1071::skewness(z_n_clean_numeric, type = 1)
-z_n_kurt <- e1071::kurtosis(z_n_clean_numeric, type = 1)
-
-desc_z_n_clean <- tibble(
-  Statistic = c(
-    "Sample Mean",
-    "Sample Variance",
-    "Skewness",
-    "Excess Kurtosis"
-  ),
-  Value = c(
-    z_n_mean,
-    z_n_vari,
-    z_n_skew,
-    z_n_kurt
-  )
-) |>
-  mutate(Value = sprintf("%.6f", Value))
-```
-
-```{r zn-desc, echo=FALSE, message=FALSE, warning=FALSE}
-kable(
-  desc_z_n_clean,
-  # caption = "Descriptive statistics of cleaned log returns ($z_n$).",
-  caption = paste0(
-    "Descriptive statistics of cleaned Nasdaq log returns (n = ", 
-    format(length(z_n_clean), big.mark = ","), 
-    "). Skewness and kurtosis were calculated using Type 1 estimators. Given the large sample size, differences compared to bias-corrected (Type 2 or 3) estimators are negligible."
-  ),
-  booktabs = TRUE,
-  align = c("l", "r"),
-  escape = FALSE
-) |>
-  kable_styling(
-      full_width = FALSE, 
-      position = "center", 
-      latex_options = "hold_position"
-    )
-```
-
-```{r zn-desc-ad, echo=FALSE, message=FALSE, warning=FALSE, include = FALSE}
-#- Element 1 - (bonus) Table with type 2 & 3 estimators (not used in report) --#
-# BE note: changed to include = FALSE on 19/11/2025
-z_n_clean_numeric <- as.numeric(z_n_clean)
-
-desc_ad <- tibble(
-  Statistic = c(
-    "Sample Mean",
-    "Sample Variance",
-    "Skewness (Type 1)",
-    "Skewness (Type 2)",
-    "Skewness (Type 3)",
-    "Excess Kurtosis (Type 1)",
-    "Excess Kurtosis (Type 2)",
-    "Excess Kurtosis (Type 3)"
-  ),
-  Value = c(
-    mean(z_n_clean_numeric),
-    var(z_n_clean_numeric),
-    e1071::skewness(z_n_clean_numeric, type = 1),
-    e1071::skewness(z_n_clean_numeric, type = 2),
-    e1071::skewness(z_n_clean_numeric, type = 3),
-    # already excess kurtosis for type = 1
-    e1071::kurtosis(z_n_clean_numeric, type = 1),
-    e1071::kurtosis(z_n_clean_numeric, type = 2),
-    e1071::kurtosis(z_n_clean_numeric, type = 3)
-  )
-) |>
-  mutate(Value = sprintf("%.6f", Value))
-kable(
-  desc_ad,
-  caption = "Additional descriptive statistics of cleaned log returns ($z_n$).",
-  booktabs = TRUE,
-  align = c("l", "r"),
-  escape = FALSE
-) |>
-  kable_styling(full_width = FALSE, position = "center")
-```
-
-
-```{r Test of normality, echo=FALSE, include = FALSE}
-ad_test_result <- ad.test(z_n_clean)
-ad_test_result
-```
-
-Nasdaq Composite adjusted closing prices (2018–2024) were reviewed to identify
-periods of volatility unrelated to legitimate market activity.[^legit-market]
-Following numerical analysis and qualitative review, only the onset of the
-COVID-19 pandemic was excluded as a non-representative outlier (Figure
-\@ref(fig:timeline-fig)). Further details on the exclusion window methodology
-are discussed in Appendix \S\@ref(apd-COVID19-selection).
-
-The resulting daily log-returns ($Z_n$) exhibit significant excess kurtosis
-($\gamma_2$= `r formatC(e1071::kurtosis(z_n_clean_numeric, type = 1), format = "fg", digits = 3)`). 
-This leptokurtic behavior is consistent with the "stylized empirical facts" of 
-financial time series described by @Cont01022001 and early findings by 
-@Mandelbrot1963.[^cont2001quote]
-
-Given the heavy-tailed nature of the data, the Anderson–Darling test was
-selected to assess normality. The Anderson–Darling test is preferable to
-alternatives, such as the Kolmogorov–Smirnov test, due to its increased
-sensitivity to deviations in the tails of the distribution. The hypotheses are
-defined as:
-
-$$
-\begin{cases}
-H_0: Z_n \text{ is drawn from a normal distribution}\\
-H_1: Z_n \text{ is not drawn from a normal distribution}
-\end{cases}
-$$
-
-Alternative notation
-$$
-\begin{cases}
-H_0: Z_n \sim {N}(\mu, \sigma^2) & \text{(data are normally distributed)} \\
-H_1: Z_n \nsim {N}(\mu, \sigma^2) & \text{(data are not normally distributed)}
-\end{cases}
-$$
-
-The test statistic was A= `r round(ad_test_result$statistic, 1)` 
-(p `r format_p_vals(ad_test_result$p.value)`). We therefore reject the null
-hypothesis ($H_0$). The Anderson-Darling test provides strong evidence that the 
-Nasdaq log-returns are not normally distributed.
 
 ## Investigation of normality by resampling {#elementTwo}
 
@@ -2064,6 +2071,12 @@ Therefore test 1 wasn't suitable because y and test 2 was not suitable because o
 
 ## Methodology for COVID-19 exclusion identification {#apd-COVID19-selection}
 
+What constitutes “legitimate” market activity is itself debatable. One could
+potentially exclude other volatile periods, but we felt doing so would not align 
+with the aim of this analysis, which is to test how well the standard log-return
+model describes the behaviour of the Nasdaq Composite under _realistic_ / 
+_actual_ market conditions. 
+
 Rough notes:
 
 - LU 1 – shows existing pre-COVID up trend
@@ -2204,8 +2217,5 @@ final analysis, interpretation, and writing in this report were generated by
 
 [^legit-market]:
     We acknowledge that what constitutes “legitimate” market activity is itself
-    debatable. One could potentially exclude other volatile periods, but doing
-    so would not align with the aim of this analysis, which is to test how well
-    the standard log-return model describes the behaviour of the Nasdaq
-    Composite under realistic market conditions.
+    debatable. 
 
