@@ -213,72 +213,87 @@ format_p_vals <- function(p) {
 # December 2024 were extracted using `getSymbols` from the `quantmod` package.
 # These data were then used as the basis for our statistical evaluation in this
 # report.
+# 
+# Update 2025-11-21: included download for full IXIC data (used in appendix)
 #
 # Define inputs & date range
 ticker <- "^IXIC"
-from   <- as.Date("2018-01-01")
-to     <- as.Date("2024-12-31")
+study_from <- as.Date("2018-01-01")
+study_to   <- as.Date("2024-12-31")
+
+# All data (for appendix etc.)
+full_from  <- as.Date("1971-01-01")
+full_to    <- study_to
 
 # Clean ticker for filename (remove ^ and any non-alphanumerics)
 ticker_clean <- gsub("[^A-Za-z0-9]", "", ticker)
 
-# Create filename (IXIC20180101to20241231.csv)
-fname <- sprintf(
-  "%s%sto%s.csv",
-  ticker_clean,
-  format(from, "%Y%m%d"),
-  format(to,   "%Y%m%d")
-)
+make_fname <- function(prefix, from, to) {
+  sprintf(
+    "%s_%s_%sto%s.csv",
+    ticker_clean,
+    prefix,
+    format(from, "%Y%m%d"),
+    format(to,   "%Y%m%d")
+  )
+}
 
 load_from_csv <- function(path) {
   dat <- read.csv(path, stringsAsFactors = FALSE)
-  # req date -> if missing force error & re-download
   if (!"Date" %in% names(dat)) {
-    stop("CSV does not have expected 'Date' column.")
+    stop("csv file does not have expected 'Date' column.")
   }
   xts::xts(
-    dat[ , setdiff(names(dat), "Date"), drop = FALSE],
+    dat[, setdiff(names(dat), "Date"), drop = FALSE],
     order.by = as.Date(dat$Date)
   )
 }
 
-# Download data from our given ticker
 download_ixic <- function(ticker, from, to) {
   getSymbols(
     ticker,
+    src         = "yahoo",
     from        = from,
     to          = to,
     auto.assign = FALSE
   )
 }
 
-use_download <- FALSE
-# Check to see if file exists -> if not then download data
-if (file.exists(fname)) {
-  IXIC <- tryCatch(
-    load_from_csv(fname),
-    error = function(e) {
-      message("Cached file invalid, downloading fresh data: ", e$message)
-      use_download <<- TRUE
-      download_ixic(ticker, from, to)
-    }
-  )
-} else {
-  use_download <- TRUE
-  IXIC <- download_ixic(ticker, from, to)
+# General "load or download + cache" helper
+load_or_download_xts <- function(ticker, from, to, cache_file) {
+  need_write <- FALSE
+
+  if (file.exists(cache_file)) {
+    dat <- tryCatch(
+      load_from_csv(cache_file),
+      error = function(e) {
+        message("Cached file invalid, downloading fresh data: ", e$message)
+        need_write <<- TRUE
+        download_ixic(ticker, from, to)
+      }
+    )
+  } else {
+    need_write <- TRUE
+    dat <- download_ixic(ticker, from, to)
+  }
+
+  if (need_write) {
+    df <- data.frame(
+      Date = index(dat),
+      coredata(dat)
+    )
+    write.csv(df, cache_file, row.names = FALSE)
+  }
+
+  dat
 }
 
-# If downloaded write/rewrite clean csv
-if (use_download) {
-  ixic_df <- data.frame(
-    Date = index(IXIC),
-    coredata(IXIC)
-  )
-  write.csv(ixic_df, fname, row.names = FALSE)
-}
+# get full ixic data (1971-01-01 -> 2024-12-31)
+fname_full <- make_fname("full", full_from, full_to)
+IXIC_full  <- load_or_download_xts(ticker, full_from, full_to, fname_full)
 
-# (old) Download the data
-# getSymbols("^IXIC", from = "2018-01-01", to = "2024-12-31")
+# get subset for our date range (2018-01-01 -> 2024-12-31)
+IXIC <- IXIC_full[paste0(study_from, "/", study_to)]
 ```
 
 ```{r Prepare data, echo=FALSE}
@@ -449,12 +464,13 @@ p2_vol <- ggplot(el1_df, aes(x = date, y = rolling_volatility)) +
   )
 ```
 
-
-```{r Element 1 - cleaning, echo = FALSE}
+```{r Element 1, echo=FALSE}
 # ==============================================================================
 #---------- Element 1: data cleaning and standard test of normality -----------#
 # ==============================================================================
+```
 
+```{r Element 1 - cleaning, echo = FALSE}
 # outlier_periods_to_remove <- c(
 #   "2020-03-01/2020-04-17",
 #   "2021-01-10/2021-03-20",
@@ -740,12 +756,12 @@ qualitative review, only the onset of the COVID-19 pandemic was excluded as a
 non-representative outlier. Figure
 \@ref(fig:initial-data-visualisation-volatility-and-regions-to-remove) shows the
 Nasdaq adjusted close over this period and the period selected for exclusion.
-Further details on the COVID-19 exclusion window are discussed in Appendix
-\S\@ref(apd-COVID19-selection).
+Further details regarding the exclusion selection process are discussed in
+Appendix \S\@ref(apd-outlier-selection).
 
 As shown in Table \@ref(tab:zn-desc), the resulting daily log-returns ($Z_n$) 
-exhibit significant excess kurtosis
-($\gamma_2$= `r formatC(e1071::kurtosis(z_n_clean_numeric, type = 1), format = "fg", digits = 3)`). 
+exhibit pronounced excess kurtosis
+($\gamma_2 =$ `r formatC(e1071::kurtosis(z_n_clean_numeric, type = 1), format = "fg", digits = 3)`). 
 This leptokurtic behavior is consistent with the "stylized empirical facts" of 
 financial time series described by @Cont01022001 and early findings by 
 @Mandelbrot1963.[^cont2001quote]
@@ -763,28 +779,20 @@ H_1: Z_n \text{ is not drawn from a normal distribution}
 \end{cases}
 $$
 
-Alternative notation
-$$
-\begin{cases}
-H_0: Z_n \sim {N}(\mu, \sigma^2) & \text{(data are normally distributed)} \\
-H_1: Z_n \nsim {N}(\mu, \sigma^2) & \text{(data are not normally distributed)}
-\end{cases}
-$$
-
-The test statistic was A= `r round(ad_test_result$statistic, 1)` 
+The test statistic was A = `r round(ad_test_result$statistic, 1)` 
 (p `r format_p_vals(ad_test_result$p.value)`). We therefore reject the null
 hypothesis ($H_0$). The Anderson-Darling test provides strong evidence that the 
 Nasdaq log-returns are not normally distributed.
 
 
-```{r timeline-fig, echo=FALSE, fig.cap="Nasdaq Periods from 2018-2024 reviewed as potential outliers for this report.", out.width="80%", fig.align='center', out.width="100%",}
+```{r timeline-fig, echo=FALSE, fig.cap="Notable Nasdaq market events from 2018-2024. Only the period associated with COVID-19 met the numerical criteria for a systemic outlier.", out.width="80%", fig.align='center', out.width="100%"}
 knitr::include_graphics("fig/timeline2.pdf")
 ```
 
 
-```{r initial-data-visualisation-volatility-and-regions-to-remove, eval = TRUE, echo = FALSE, fig.width=6, fig.height=7.0, fig.cap = "Nasdaq Composite price and volatility, 2018–2024. From top to bottom: (i) daily adjusted closing price; (ii) daily log-return increments; (iii) 60-day rolling volatility, measured as the standard deviation of daily log-returns over a 60-trading-day rolling window; and (iv) daily log-return increments after excluding high-volatility outlier periods.", fig.pos='!ht'}
+```{r initial-data-visualisation-volatility-and-regions-to-remove, eval = TRUE, echo = FALSE, fig.width=6, fig.height=7.0, fig.cap = "Nasdaq Composite price and volatility, 2018–2024. The high-volatility period associated with COVID-19 is indicated by the red shaded region (labeled 1). From top to bottom: (i) daily adjusted closing price; (ii) daily log-return increments; (iii) 20-day rolling volatility, measured as the standard deviation of daily log-returns over a 20-trading-day rolling window; and (iv) daily log-return increments after excluding the marked COVID-19 period.", fig.pos='!ht'}
 #------------ Element 1 - Figure showing data pre & post-exclusion ------------#
-trading_period_days <- 60
+trading_period_days <- 20
 
 # trading period rolling log-return volatility (standard deviation)
 el1_rolling_sd <- rollapply(
@@ -798,7 +806,7 @@ el1_rolling_sd <- rollapply(
 # It's challenging to convey this within the text limits for element 1.  Opted 
 # to introduce later mathematically where we have a bit more space
 
-# periods to remove (as before)
+# periods to remove
 outlier_df <- tibble(
   id     = seq_along(outlier_periods_to_remove),
   period = outlier_periods_to_remove
@@ -810,6 +818,29 @@ outlier_df <- tibble(
     mid   = start + floor(as.numeric(end - start) / 2),
     label = as.character(id)
   )
+# outliner dotted lines for all plots
+outlier_lines <- list(
+  geom_vline(
+    data = outlier_df, 
+    aes(xintercept = start), 
+    linetype = "dotted", 
+    color = "red" # Added color here
+  ),
+  geom_vline(
+    data = outlier_df, 
+    aes(xintercept = end), 
+    linetype = "dotted", 
+    color = "red" # Added color here
+  )
+)
+# testing using a shaded rectangle instead
+outlier_shading <- geom_rect(
+  data = outlier_df,
+  aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf),
+  fill = "red", 
+  alpha = 0.2,       # Makes it transparent
+  inherit.aes = FALSE # Prevents conflicts with main plot aesthetics
+)
 
 # align price with z_n
 IXIC_price_aligned <- IXIC_ad[index(z_n)]
@@ -849,20 +880,11 @@ initial_vis_p1 <- ggplot(df, aes(date, price)) +
   geom_line() +
   labs(
     title = "Nasdaq Composite (Adjusted Close)",
-    x = "Date",
+    x = NULL,
     y = "Adjusted close (USD)"
   ) +
   base_theme +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = start),
-    linetype = "dotted"
-  ) +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = end),
-    linetype = "dotted"
-  ) +
+  outlier_shading +
   geom_point(
     data = outlier_df,
     aes(x = mid, y = label_y_p1),
@@ -886,22 +908,13 @@ initial_vis_p2 <- ggplot(df, aes(date, z_n)) +
   geom_line() +
   labs(
     title = "Daily Log-return Increments",
-    x = "Date",
+    x = NULL,
     y = expression(z[n])
   ) +
   base_theme +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = start),
-    linetype = "dotted"
-  ) +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = end),
-    linetype = "dotted"
-  )
+  outlier_shading
 
-# initial_vis p3: 60-day rolling log-return volatility (SD)
+# initial_vis p3: 20-day rolling log-return volatility (SD)
 initial_vis_p3 <- ggplot(df, aes(date, rolling_sd)) +
   geom_line(na.rm = TRUE) +
   labs(
@@ -910,20 +923,11 @@ initial_vis_p3 <- ggplot(df, aes(date, rolling_sd)) +
       trading_period_days, 
       "-day rolling window)"
       ),
-    x = "Date",
+    x = NULL,
     y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   base_theme +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = start),
-    linetype = "dotted"
-  ) +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = end),
-    linetype = "dotted"
-  )
+  outlier_shading
 
 # initial_vis_ p4: cleaned log-return series
 df_clean_raw <- tibble(
@@ -953,6 +957,9 @@ initial_vis_p4 <- ggplot(df_clean, aes(date, z_n)) +
 (initial_vis_p1 / initial_vis_p3 / initial_vis_p2 / initial_vis_p4)
 ```
 
+```{=latex}
+\newpage
+```
 
 ## Investigation of normality by resampling {#elementTwo}
 
@@ -987,11 +994,12 @@ underlying data being normal.
 Idea: then repeat this process using bootstrapping and z-data.
 
 Non-parametric bootstrap...
-
-```{r Element 2 pt1 - Simulating skewness from a normal distribution, cache = FALSE}
+```{r Element 2, echo=FALSE}
 # ==============================================================================
 #------------ Element 2: investigation of normality by resampling -------------#
 # ==============================================================================
+```
+```{r Element 2 pt1 - Simulating skewness from a normal distribution, cache = FALSE, echo = FALSE}
 # set random seed
 set.seed(1234)
 
@@ -1014,15 +1022,18 @@ skew_bootstrap <- replicate(
 #------------ basic
 skew_normal_sim_median <- median(skew_normal_sim)
 skew_normal_bootstrap  <- median(skew_bootstrap)
-sd(skew_normal_sim)
-sd(skew_bootstrap)
+sd_normal_sim <- sd(skew_normal_sim)
+sd_normal_boo <- sd(skew_bootstrap)
 el2_original_skew <- e1071::skewness(z_n_clean, type = 1)
 el2_bias <- mean(skew_bootstrap) - el2_original_skew
 
 #------------ statistics/metrics
 # calculating quantile based confidence interval
-print(quantile(skew_bootstrap, probs = c(0.025, 0.975)))
-print(quantile(skew_normal_sim, probs = c(0.025, 0.975)))
+ci_95_skew_zn_boot_quantile <- quantile(skew_bootstrap, probs = c(0.025, 0.975))
+ci_95_skew_normals_quantile <- quantile(skew_normal_sim, probs = c(0.025, 0.975))
+# 
+# print(ci_95_skew_zn_boot_quantile)
+# print(ci_95_skew_normals_quantile)
 ```
 
 ```{r el2-testing, echo=FALSE, cache = FALSE}
@@ -1084,7 +1095,7 @@ print(quantile(skew_normal_sim, probs = c(0.025, 0.975)))
 }
 ```
 
-```{r , echo=FALSE, cache = FALSE}
+```{r bca-interval-bcanon, echo=FALSE, cache = FALSE}
 
 #------------ BCa interval for skewness using bcanon
 bca_skew <- bcanon(
@@ -1095,19 +1106,19 @@ bca_skew <- bcanon(
   type  = 1
 )
 
-# calculating quantile based confidence interval
-print(quantile(skew_bootstrap, probs = c(0.025, 0.975)))
-print(quantile(skew_normal_sim, probs = c(0.025, 0.975)))
+# # calculating quantile based confidence interval
+# print(ci_95_skew_zn_boot_quantile)
+# print(ci_95_skew_normals_quantile)
 
 # alpha and corresponding BCa points
-print(bca_skew$confpoints)
+# print(bca_skew$confpoints)
 
 skew_boot_full <- replicate(
   N_reps,
   e1071::skewness(sample(z_n_clean, length(z_n_clean), replace = TRUE), type = 1)
 )
 
-quantile(skew_boot_full, c(0.025, 0.975))
+# quantile(skew_boot_full, c(0.025, 0.975))
 
 #------------ 95% CIs for comparison ----------
 
@@ -1174,7 +1185,7 @@ kable(
 An overlapping density plot was used to illustrate the differences between the
 two skewness simulations.
 
-```{r skewness-densities, fig.cap = paste0("Sampling distributions of the skewness estimator for ",N_reps, " samples of size n=", n_sample_size, " taken from a Normal model (blue) and from the empirical log-returns $z_n$ via bootstrap (red).")}
+```{r skewness-densities, echo=FALSE, fig.cap = paste0("Sampling distributions of the skewness estimator for ",N_reps, " samples of size n=", n_sample_size, " taken from a Normal model (blue) and from the empirical log-returns $z_n$ via bootstrap (red).")}
 
 # bootstrapping skewness simulation
 skew_df <- data.frame(
@@ -1233,6 +1244,10 @@ size. This observation is in agreement with the Anderson-Darling test
 (\S\@ref(elementOne)) and provides further evidence against an assumption
 of normality for these data.
 
+```{=latex}
+\newpage
+```
+
 ## Investigation of constant mean {#elementThr}
 
 <!-- ### Instructions (to be removed later) -->
@@ -1255,11 +1270,13 @@ of 14 xts objects, each representing a 6-month period. The number of data points
 per six-month period is shown in Table \@ref(tab:days-per-six-month-period),
 located in the Appendix.
 
-```{r Element 3 pt1 - TBC}
+```{r Element 3, echo=FALSE}
 # ==============================================================================
 #----------------- Element 3: investigation of constant mean ------------------#
 # ==============================================================================
+```
 
+```{r Element 3 pt1 - TBC, echo = FALSE}
 # # ---------------- attempt 01: using flexible 6 month windows
 # # split z data into 14 subsamples
 # z_list <- split(z_n_clean, f = "months", k = 6)
@@ -1343,7 +1360,7 @@ ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
 
 ### Statistical test
 
-```{r}
+```{r kruskal-test, echo = FALSE}
 kruskal_res <- kruskal.test(z_value ~ Period, data = combined_df_el3)
 ```
 
@@ -1384,10 +1401,27 @@ ranks) of the groups. Under the null hypothesis $H_0$, all groups share the same
 distribution. If we assume similar spread and shape, this can be interpreted as
 equality of medians (ref!).
 
-    - Comment on Kruskal-Wallis assumptions (independence element can be referenced)
+- Comment on Kruskal-Wallis assumptions (independence element can be referenced)
 
 This checks for differences in central tendency across groups and the null
 hypothesis ($H_0$) is that the medians of all 14 groups are equal.
+
+Kruskal–Wallis: The hypotheses are defined as:
+
+$$
+\begin{cases}
+H_0: \text{The distributions of the 14 subsamples are identical} & (F_1 = F_2 = \dots = F_{14}) \\
+H_1: \text{At least one subsample tends to yield larger values} & (\exists i,j: P(X_i > X_j) > 0.5)
+\end{cases}
+$$
+OR
+$$
+\begin{cases}
+H_0: \text{The distributions of the 14 samples are identical} \\
+H_1: \text{At least one sample comes from a distribution that tends} \\ 
+\quad \ \ \text{to produce larger or smaller values than the others}
+\end{cases}
+$$
 
 As shown in Table \@ref(tab:kruskal-res), there are no statistically significant
 differences in the typical (central) log-return across the periods
@@ -1402,11 +1436,13 @@ mean (or median) log-return over time.
 ## Investigation of constant variance {#elementFou}
 
 <!-- ### Identifying subsamples with max/min variance (chapter 4 in CS1) -->
-
-```{r Element 4 pt1 - processing, echo=FALSE}
+```{r Element 4, echo=FALSE}
 # ==============================================================================
 #--------------- Element 4: investigation of constant variance ----------------#
 # ==============================================================================
+```
+
+```{r Element 4 pt1 - processing, echo=FALSE}
 variances <- sapply(z_list, var, na.rm = TRUE)
 min_var_loc <- which.min(variances)
 max_var_loc <- which.max(variances)
@@ -1638,7 +1674,7 @@ kable(
 #   kable_styling(full_width = FALSE, position = "center")
 ```
 
-```{r testing-anualised-data}
+```{r testing-anualised-data, echo=FALSE}
 # Daily variance per period, then annualise
 variances_daily <- sapply(z_list, var, na.rm = TRUE)
 variances_ann   <- variances_daily * 252
@@ -1677,7 +1713,9 @@ s2_max_ann <- var(max_var_sample) * 252
 
 min_period_label <- period_labels[min_var_loc]
 max_period_label <- period_labels[max_var_loc]
+```
 
+```{r testing-table-rename, echo=FALSE}
 var_ci_table <- data.frame(
   Subsample = c("Min variance", "Max variance"),
   Period    = c(min_period_label, max_period_label),
@@ -1816,10 +1854,13 @@ Test of the Efficient Markets Hypothesis, which implies that past returns
 
 <!-- # ``` -->
 
-```{r Element 5 pt1 - independence of increments}
+```{r Element 5, echo=FALSE}
 # ==============================================================================
 #------------------- Element 5: independence of increments --------------------#
 # ==============================================================================
+```
+
+```{r Element 5 pt1 - independence of increments, echo=FALSE}
 # Create a $z_{n-1}$ series
 z_lag <- stats::lag(z_n_clean, k = 1)
 
@@ -1844,15 +1885,15 @@ con_table <- table(z_n_minus_1_cat, z_n_cat)
 
 # statistical test (want Chi-squared, but need to see if cell frequencies are >5)
 chisq_result <- chisq.test(con_table)
-chisq_result
-chisq_result$expected
-# If any expected counts are low (R will often produce a warning), the $\chi^2$ p-value is unreliable.
-# may then want to use Fisher's Exact Test
+# chisq_result
+# chisq_result$expected
+
+# If any expected counts are low (R will often produce a warning), 
+# the $\chi^2$ p-value is unreliable may then want to use Fisher's Exact Test
 if (any(chisq_result$expected < 5)) {
   fisher_result <- fisher.test(con_table)
   fisher_result
 }
-#
 ```
 
 ```{r contingency-table, echo=FALSE, message=FALSE, warning=FALSE}
@@ -1882,10 +1923,20 @@ None of the cell frequencies are \<5 so we can use chi-squared test.
 All expected cell frequencies exceed 5, so the assumptions for Pearson’s
 chi-squared test of independence are satisfied.
 
+!BE note: talk about robustitity of Pearson's chi-squared test... Is it fragile?
+
 The null hypothesis ($H_0$) for both tests is that the row and column variables
 are independent - here that the categorical distribution of the current
-log-return $z_n$ is independent of hte distribution of the lagged log-return
+log-return $z_n$ is independent of the distribution of the lagged log-return
 $z_{n-1}$.
+
+Pearson’s chi-squared test of independence: The hypotheses are defined as:
+$$
+\begin{cases}
+H_0: \text{Today's quartile is independent of yesterday's} \\ 
+H_1: \text{Today's quartile is dependent on yesterday's} 
+\end{cases}
+$$
 
 The test returns $\chi^2$(\text{df} = `r chisq_result$parameter`) =
 `r formatC(unname(chisq_result$statistic), format = "f", digits = 2)` with !p
@@ -1894,6 +1945,10 @@ The test returns $\chi^2$(\text{df} = `r chisq_result$parameter`) =
 $H_0$. This provides statistical evidence that $z_n$ is dependent on the
 classification of $z_{n-1}$ and this finding does not not support the Efficient
 Markets Hypothesis.
+
+```{=latex}
+\newpage
+```
 
 ## General upwardness of trend {#elementSix}
 
@@ -1909,10 +1964,13 @@ Markets Hypothesis.
 <!-- longer than one day.) Identify the runs in your data set and test whether -->
 <!-- positive runs have longer mean duration than negative runs. -->
 
-```{r Element 6 - proportion of positive increments}
+```{r Element 6, echo=FALSE}
 # ==============================================================================
 #------------------- Element 6: general upwardness of trend -------------------#
 # ==============================================================================
+```
+
+```{r Element 6 - proportion of positive increments, echo=FALSE}
 num_positive <- sum(z_n_clean > 0)
 total_days <- length(z_n_clean)
 # test using binomial (could also approximate, but Russell normally says
@@ -1949,6 +2007,15 @@ The proportion of days with a positive log-return is
 
 A one tailed binomial test was used to calculate the probability of this
 occurring assuming a null hypothesis, $H_0$, of $p=0.5$ ($H_1: \; p>0.5$)
+
+The hypotheses are defined as:
+$$
+\begin{cases}
+H_0: \text{Probability of a positive return is } \le 0.5 & (p \le 0.5) \\
+H_1: \text{Probability of a positive return is } > 0.5 & (p > 0.5)
+\end{cases}
+$$
+
 
 The exact binomial test assumes:
 
@@ -1990,6 +2057,15 @@ The Mann–Whitney / Wilcoxon rank-sum test assumes:
 - The response is ordinal (run lengths are counts of days).
 - Under $H_0$ the two populations have the same distribution.
 
+
+The Mann–Whitney / Wilcoxon hypotheses are defined as:
+$$
+\begin{cases}
+H_0: \text{Run lengths have identical distributions}  \\
+H_1: \text{Positive runs tend to be longer} 
+\end{cases}
+$$
+
 <!-- Run lengths are discrete and may not be perfectly independent in a strict time-series sense, but the test is robust to moderate deviations from these assumptions. Because run lengths are non-negative integers and can be skewed, a non-parametric test is more appropriate than a two-sample  -->
 <!-- t-test, which would require approximate normality of run lengths in each group. -->
 
@@ -1998,6 +2074,9 @@ Wilcoxon rank sum test with continuity correct found p
 the null hypothesis in favour of the alternative hypothesis (the positive runs
 have a shift greater than 0).
 
+```{=latex}
+\newpage
+```
 # Conclusions
 
 While the log-normal model was invalidated by the data's non-normality
@@ -2037,45 +2116,185 @@ Want to wrap these up into some sort of formal conclusion...
 
 - Something to discuss
 
+
+<!-- ```{=html} -->
+<!-- # References -->
+<!-- <div id="refs"></div> -->
+<!-- ``` -->
+
+<!-- ```{=latex} -->
+<!-- \bibliography{references.bib} -->
+<!-- ``` -->
+
 ```{=latex}
 \newpage
+\section*{Appendices}
+\addcontentsline{toc}{section}{Appendices}
 ```
 
-# Appendix
+# (APPENDIX) Appendices {-} 
 
-## Accessibility and reproducability
+# Supplemental methodology {#apd-supplementary-methods}
 
-An accessible HTML version of this report is available via a public GitHub page:
+## Data cleaning & outlier selection {#apd-outlier-selection}
 
-- https://ytterbiu.github.io/a_group07-project
+```{r appendix, echo = FALSE}
+# ==============================================================================
+#----------------------- Appendix: determining outliers -----------------------#
+# ==============================================================================
+```
 
-This report was created in R Markdown. The source code is open source and is
-available via https://github.com/ytterbiu/a_group07-project/tree/main. Changes
-made to this document were tracked using Git and are also available via the same
-repository (https://github.com/ytterbiu/a_group07-project/commits/main/). Please
-note that this commit history reflects updates made to the project respository
-and is not a comprehensive timeline of all contributions by all group members.
+```{r appendix-outlier-methods, echo=FALSE}
+# Concept: use full range of Nasdaq data (i.e., since the 1970s) then plot 
+# volatility and identify threshold to use to select outlier regions from our 
+# time period
+threshold_annual_volitility <- 0.70
 
-## Test selection rationale {#apd-test-rationale}
+nasdaq_data_full <- data.frame(
+  date = index(IXIC_full),
+  price = as.numeric(Cl(IXIC_full))
+) %>%
+  arrange(date) %>%
+  mutate(
+    log_ret = c(NA, diff(log(price))),
+    # Get annualised volatility (*252) for no. of trading days per year
+    volitility_20d = runSD(log_ret, n = 20) * sqrt(252),
+    volitility_60d = runSD(log_ret, n = 60) * sqrt(252)
+  ) %>%
+  filter(!is.na(volitility_20d)) %>%
+  filter(!is.na(volitility_60d))
 
-### Test of normality (\S\@ref(elementOne)) 
+# Get percentiles for breaches of threshold defined above
+vol_percentiles <- quantile(
+  nasdaq_data_full$volitility_20d,
+  probs = c(0.90, 0.95, 0.99, 0.995),
+  na.rm = TRUE
+)
 
-Three tests for normality were considered, the ... 
+# get dates where 20d vol > threshold
+nasdaq_breaches_full <- nasdaq_data_full %>%
+  filter(volitility_20d > threshold_annual_volitility) %>%
+  select(date, volitility_20d)
 
-Their use cases are outlined in the Table below (Table xx).
+# print("Major Crash Dates detected:")
+# nasdaq_breaches_full
+```
 
-For this report, the data were found to be (put stats from section 1).  
-Test AD was suitable. 
-Therefore test 1 wasn't suitable because y and test 2 was not suitable because of z.
+As noted in \S\@ref(elementOne), our criteria for outliers was based upon a
+definition of legitimate market activity. Whilst the definition of legitimate
+activity is debatable, we adopted a conservative approach, excluding only
+systemic shocks that represent a fundamental breakdown in market mechanics. Such
+events are expected to occur less than once per decade. To identify these 
+periods a numerical volatility threshold was implemented.
 
+### Numerical Justification using Volatility Thresholding
 
-## Methodology for COVID-19 exclusion identification {#apd-COVID19-selection}
+Using the full history of the Nasdaq Composite (1971–2024), the annualised
+20-day rolling volatility was calculated to benchmark the 2018–2024 study period
+against historical extremes (Figure \@ref(fig:nasdaqAllTimeVol)).
 
-What constitutes “legitimate” market activity is itself debatable. One could
-potentially exclude other volatile periods, but we felt doing so would not align 
-with the aim of this analysis, which is to test how well the standard log-return
-model describes the behaviour of the Nasdaq Composite under _realistic_ / 
-_actual_ market conditions. 
+```{r nasdaqAllTimeVol, eval = TRUE, echo = FALSE, fig.height=4.4, fig.pos='!ht', fig.cap="Nasdaq Composite index price volatility from 1971-2024. The dotted line shows the volatility threshold applied to identify outliers and the red shaded region indicates the excluded window in 2018-2024 associated with the COVID-19 pandemic."}
+#----------- Appendix Figure: full nasdaq rolling 20day volatility ------------#
+appendix_p1 <- ggplot(nasdaq_data_full, aes(x = date)) +
+  geom_line(aes(y = volitility_20d, color = "20-Day"), size = 0.3) +
+  # geom_line(aes(y = volitility_60d, color = "60-Day"), size = 0.6, alpha = 0.8) +
+  geom_hline(yintercept = threshold_annual_volitility, linetype = "dashed", color = "black") +
+  annotate(
+    "text",
+    x = as.Date("1975-01-01"),
+    y = threshold_annual_volitility+0.1,
+    label = paste0("Threshold (", threshold_annual_volitility, ")"),
+    size = 3
+  ) +
+  scale_color_manual(values = c("20-Day" = "black", "60-Day" = "blue")) +
+  labs(
+    title = paste0(
+      "Nasdaq Composite Volatility (", 
+      trading_period_days, 
+      "-day rolling window)"
+      ),
+    x = "Date",
+    y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+  ) +
+  # not visible when included so commented out
+  # outlier_shading +
+  ylim(0.01, 0.99) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# plot 2 (zoomed)
+appendix_p2 <- ggplot(
+  filter(nasdaq_data_full, date >= "2018-01-01" & date <= "2025-12-31"),
+  aes(x = date)
+) +
+  geom_line(aes(y = volitility_20d, color = "20-Day"), size = 0.5) +
+  # geom_line(aes(y = volitility_60d, color = "60-Day"), size = 0.8, alpha = 0.8) +
+  # covid shading
+  outlier_shading +
+  # annotate(
+  #   "text",
+  #   x = as.Date("2020-03-01"), y = 0.9,
+  #   label = "COVID Exclusion",
+  #   color = "black", size = 3, hjust = 0
+  # ) +
+  scale_color_manual(values = c("20-Day" = "black", "60-Day" = "blue")) +
+  labs(
+    title = paste0(
+      "Nasdaq Composite Volatility (", 
+      trading_period_days, 
+      "-day rolling window)"
+      ),
+    x = "Date",
+    y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+  ) +
+  ylim(0.01, 0.99) +
+  # theme(legend.position = "none") +
+  theme_minimal()
+
+(appendix_p1 / appendix_p2) &
+  theme(
+    plot.title  = element_text(hjust = 0.5),
+    plot.margin = margin(5.5, 5.5, 5.5, 5.5),
+    legend.position = "none"
+  )
+```
+
+A threshold of 0.70 (70% annualised volatility) was selected. Note that
+annualised volatility can exceed 100%. This metric represents the standard
+deviation of daily log-returns scaled to an annual timeframe ($\sigma_{ann} =
+\sigma_{daily} \times \sqrt{252}$).
+
+As shown in Figure \@ref(fig:nasdaqAllTimeVol), this threshold acts as
+a robust historical filter. Over the last 50 years, breaches of the 0.70 level
+isolate only five distinct 'systemic shock' events:
+
+1. Black Monday (1987)
+2. The Dot-Com Bubble Burst (2000)
+3. The 9/11 Recession (2001)
+4. The Global Financial Crisis (2008)
+5. The COVID-19 Pandemic (2020)
+
+This rarity is statistically corroborated by the fact that the 0.70 threshold
+corresponds to the 
+`r formatC(vol_percentiles['99.5%'], format="fg", digits=3)`th percentile of 
+all trading days since 1971.
+
+There is, therefore, strong numerical evidence to characterise the onset of the
+COVID-19 pandemic as a non-representative outlier (or a period which falls
+outside of the definition of 'legitimate market activity'). Other periods of
+volatility in the 2018-2024 window noted in Figure \@ref(fig:timeline-fig), such
+as the "Christmas Eve Massacre" (2018), the Trade War shocks (2019), and the
+Inflation Bear Market (2022), did not breach this threshold. These periods fall 
+into the category of legitimate and 'standard' market activity and were not 
+excluded.
+
+### Technical boundary definition
+
+While the volatility threshold flagged the 2020 COVID period as a systemic
+anomaly, relying solely on a rolling metric can result in imprecise window
+boundaries due to lag effects. Therefore, to define the exact start and end
+dates of the exclusion window, technical trend line analysis was applied to the
+daily price action (Figure \@ref(fig:covid-trend-lines)).
 
 Rough notes:
 
@@ -2089,11 +2308,31 @@ Rough notes:
 - We can assume the market has absorbed the shock of announcement of COVID-19.
 - Line LU2 Captures on upcoming Uptrend
 
-```{r, echo=FALSE, out.width="70%", fig.cap="Changes in the Nasdaq Composite index from x – y.  Analysis was carried out to..."}
+```{r covid-trend-lines, echo=FALSE, out.width="70%", fig.cap="Changes in the Nasdaq Composite index from x – y.  Analysis was carried out to..."}
 knitr::include_graphics("fig/appendix-COVID19-selection.pdf")
 ```
 
-## Additional tables and figures
+<!-- tools::showNonASCIIfile("your_file.Rmd") -->
+
+## Statistical test selection {#apd-test-rationale}
+
+### Test of normality (\S\@ref(elementOne)) 
+
+Three tests for normality were considered, the ... 
+
+Their use cases are outlined in the Table below (Table xx).
+
+For this report, the data were found to be (put stats from section 1).  
+Test AD was suitable. 
+Therefore test 1 wasn't suitable because y and test 2 was not suitable because of z.
+
+```{=latex}
+\newpage
+```
+
+# Additional results
+
+## Observations per Period 
 
 In \S\@ref(elementThr) the log-returns data were split into six-month periods,
 as shown in Figure \@ref(fig:element3-boxplot).
@@ -2140,12 +2379,34 @@ kable(
   )
 ```
 
+```{=latex}
+\newpage
+```
+
+# Reproducibility, accessibility & declarations (Gen-AI & word count)
 <!-- BE note: taken out as we are submitting R file separately -->
 <!-- Use: `knitr::purl("cs1-group07.rmd", documentation = 0)` to generate r file -->
+<!-- Use: `tools::showNonASCIIfile("cs1-group07.rmd")` to debug -->
 <!-- ## R Code Documentation -->
 <!-- ```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
-
 ``` -->
+
+## Reproducibility & accessibility 
+
+An accessible HTML version of this report is available via a public GitHub page:
+
+- https://ytterbiu.github.io/a_group07-project
+
+This report was created in R Markdown. The source code is open source and is
+available via:
+
+- https://github.com/ytterbiu/a_group07-project/tree/main. 
+
+Changes made to this document were tracked using Git and are also available via
+the same repository
+(https://github.com/ytterbiu/a_group07-project/commits/main/). Please note that
+this commit history reflects updates made to the project repository and is not
+a comprehensive timeline of all contributions by group members.
 
 ## Generative AI Declaration
 
@@ -2201,6 +2462,44 @@ The R code for implementation was written and debugged by the group. GenAI tools
 were used, and thought of, in the capacity of an additional group member. All
 final analysis, interpretation, and writing in this report were generated by
 (human) group members.
+
+## Word count
+
+The R Markdown file was used to produce a `tex` file. The tool `texcount` was 
+then used to count the words within each section. The output of `texcount` is 
+below:
+
+```bash
+$ texcount cs1-group07.tex      
+
+File: cs1-group07.tex
+Encoding: utf8
+Words in text: 2801
+Words in headers: 139
+Words outside text (captions, etc.): 419
+Number of headers: 37
+Number of floats/tables/figures: 14
+Number of math inlines: 53
+Number of math displayed: 10
+Subcounts:
+  text+headers+captions (#headers/#floats/#inlines/#displayed)
+  4+8+0 (1/0/0/0) _top_
+  0+1+0 (1/0/0/0) Section: Introduction}
+  4+2+0 (1/0/0/0) Subsection: Executive summary}
+  137+1+49 (1/0/4/1) Subsection: Background}
+  0+2+0 (1/0/0/0) Section: Individual elements}
+  174+7+152 (1/3/3/1) Subsection: Data cleaning and standard test of normality}
+  316+31+38 (3/2/5/0) Subsection: Investigation of normality by resampling}
+  228+10+21 (3/2/6/2) Subsection: Investigation of constant mean}
+  200+6+89 (2/4/7/3) Subsection: Investigation of constant variance}
+  157+5+13 (2/1/14/1) Subsection: Independence of increments}
+  323+11+0 (3/0/8/2) Subsection: General upwardness of trend}
+  244+1+0 (1/0/5/0) Section: Conclusions}
+...
+```
+
+These correspond to a total word count of !x for the executive summary, 
+introduction, elements 1-6, and the conclusion.
 
 ---
 

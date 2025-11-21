@@ -149,72 +149,87 @@ format_p_vals <- function(p) {
 # December 2024 were extracted using `getSymbols` from the `quantmod` package.
 # These data were then used as the basis for our statistical evaluation in this
 # report.
+# 
+# Update 2025-11-21: included download for full IXIC data (used in appendix)
 #
 # Define inputs & date range
 ticker <- "^IXIC"
-from   <- as.Date("2018-01-01")
-to     <- as.Date("2024-12-31")
+study_from <- as.Date("2018-01-01")
+study_to   <- as.Date("2024-12-31")
+
+# All data (for appendix etc.)
+full_from  <- as.Date("1971-01-01")
+full_to    <- study_to
 
 # Clean ticker for filename (remove ^ and any non-alphanumerics)
 ticker_clean <- gsub("[^A-Za-z0-9]", "", ticker)
 
-# Create filename (IXIC20180101to20241231.csv)
-fname <- sprintf(
-  "%s%sto%s.csv",
-  ticker_clean,
-  format(from, "%Y%m%d"),
-  format(to,   "%Y%m%d")
-)
+make_fname <- function(prefix, from, to) {
+  sprintf(
+    "%s_%s_%sto%s.csv",
+    ticker_clean,
+    prefix,
+    format(from, "%Y%m%d"),
+    format(to,   "%Y%m%d")
+  )
+}
 
 load_from_csv <- function(path) {
   dat <- read.csv(path, stringsAsFactors = FALSE)
-  # req date -> if missing force error & re-download
   if (!"Date" %in% names(dat)) {
-    stop("CSV does not have expected 'Date' column.")
+    stop("csv file does not have expected 'Date' column.")
   }
   xts::xts(
-    dat[ , setdiff(names(dat), "Date"), drop = FALSE],
+    dat[, setdiff(names(dat), "Date"), drop = FALSE],
     order.by = as.Date(dat$Date)
   )
 }
 
-# Download data from our given ticker
 download_ixic <- function(ticker, from, to) {
   getSymbols(
     ticker,
+    src         = "yahoo",
     from        = from,
     to          = to,
     auto.assign = FALSE
   )
 }
 
-use_download <- FALSE
-# Check to see if file exists -> if not then download data
-if (file.exists(fname)) {
-  IXIC <- tryCatch(
-    load_from_csv(fname),
-    error = function(e) {
-      message("Cached file invalid, downloading fresh data: ", e$message)
-      use_download <<- TRUE
-      download_ixic(ticker, from, to)
-    }
-  )
-} else {
-  use_download <- TRUE
-  IXIC <- download_ixic(ticker, from, to)
+# General "load or download + cache" helper
+load_or_download_xts <- function(ticker, from, to, cache_file) {
+  need_write <- FALSE
+
+  if (file.exists(cache_file)) {
+    dat <- tryCatch(
+      load_from_csv(cache_file),
+      error = function(e) {
+        message("Cached file invalid, downloading fresh data: ", e$message)
+        need_write <<- TRUE
+        download_ixic(ticker, from, to)
+      }
+    )
+  } else {
+    need_write <- TRUE
+    dat <- download_ixic(ticker, from, to)
+  }
+
+  if (need_write) {
+    df <- data.frame(
+      Date = index(dat),
+      coredata(dat)
+    )
+    write.csv(df, cache_file, row.names = FALSE)
+  }
+
+  dat
 }
 
-# If downloaded write/rewrite clean csv
-if (use_download) {
-  ixic_df <- data.frame(
-    Date = index(IXIC),
-    coredata(IXIC)
-  )
-  write.csv(ixic_df, fname, row.names = FALSE)
-}
+# get full ixic data (1971-01-01 -> 2024-12-31)
+fname_full <- make_fname("full", full_from, full_to)
+IXIC_full  <- load_or_download_xts(ticker, full_from, full_to, fname_full)
 
-# (old) Download the data
-# getSymbols("^IXIC", from = "2018-01-01", to = "2024-12-31")
+# get subset for our date range (2018-01-01 -> 2024-12-31)
+IXIC <- IXIC_full[paste0(study_from, "/", study_to)]
 
 # First we prepare our data, getting the adjusted close price, applying a log
 # transform, calculating the log-return increment, and removing NaN values.
@@ -611,7 +626,7 @@ ad_test_result
 knitr::include_graphics("fig/timeline2.pdf")
 
 #------------ Element 1 - Figure showing data pre & post-exclusion ------------#
-trading_period_days <- 60
+trading_period_days <- 20
 
 # trading period rolling log-return volatility (standard deviation)
 el1_rolling_sd <- rollapply(
@@ -625,7 +640,7 @@ el1_rolling_sd <- rollapply(
 # It's challenging to convey this within the text limits for element 1.  Opted 
 # to introduce later mathematically where we have a bit more space
 
-# periods to remove (as before)
+# periods to remove
 outlier_df <- tibble(
   id     = seq_along(outlier_periods_to_remove),
   period = outlier_periods_to_remove
@@ -637,6 +652,29 @@ outlier_df <- tibble(
     mid   = start + floor(as.numeric(end - start) / 2),
     label = as.character(id)
   )
+# outliner dotted lines for all plots
+outlier_lines <- list(
+  geom_vline(
+    data = outlier_df, 
+    aes(xintercept = start), 
+    linetype = "dotted", 
+    color = "red" # Added color here
+  ),
+  geom_vline(
+    data = outlier_df, 
+    aes(xintercept = end), 
+    linetype = "dotted", 
+    color = "red" # Added color here
+  )
+)
+# testing using a shaded rectangle instead
+outlier_shading <- geom_rect(
+  data = outlier_df,
+  aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf),
+  fill = "red", 
+  alpha = 0.2,       # Makes it transparent
+  inherit.aes = FALSE # Prevents conflicts with main plot aesthetics
+)
 
 # align price with z_n
 IXIC_price_aligned <- IXIC_ad[index(z_n)]
@@ -676,20 +714,11 @@ initial_vis_p1 <- ggplot(df, aes(date, price)) +
   geom_line() +
   labs(
     title = "Nasdaq Composite (Adjusted Close)",
-    x = "Date",
+    x = NULL,
     y = "Adjusted close (USD)"
   ) +
   base_theme +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = start),
-    linetype = "dotted"
-  ) +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = end),
-    linetype = "dotted"
-  ) +
+  outlier_shading +
   geom_point(
     data = outlier_df,
     aes(x = mid, y = label_y_p1),
@@ -713,22 +742,13 @@ initial_vis_p2 <- ggplot(df, aes(date, z_n)) +
   geom_line() +
   labs(
     title = "Daily Log-return Increments",
-    x = "Date",
+    x = NULL,
     y = expression(z[n])
   ) +
   base_theme +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = start),
-    linetype = "dotted"
-  ) +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = end),
-    linetype = "dotted"
-  )
+  outlier_shading
 
-# initial_vis p3: 60-day rolling log-return volatility (SD)
+# initial_vis p3: 20-day rolling log-return volatility (SD)
 initial_vis_p3 <- ggplot(df, aes(date, rolling_sd)) +
   geom_line(na.rm = TRUE) +
   labs(
@@ -737,20 +757,11 @@ initial_vis_p3 <- ggplot(df, aes(date, rolling_sd)) +
       trading_period_days, 
       "-day rolling window)"
       ),
-    x = "Date",
+    x = NULL,
     y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   base_theme +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = start),
-    linetype = "dotted"
-  ) +
-  geom_vline(
-    data = outlier_df,
-    aes(xintercept = end),
-    linetype = "dotted"
-  )
+  outlier_shading
 
 # initial_vis_ p4: cleaned log-return series
 df_clean_raw <- tibble(
@@ -804,15 +815,18 @@ skew_bootstrap <- replicate(
 #------------ basic
 skew_normal_sim_median <- median(skew_normal_sim)
 skew_normal_bootstrap  <- median(skew_bootstrap)
-sd(skew_normal_sim)
-sd(skew_bootstrap)
+sd_normal_sim <- sd(skew_normal_sim)
+sd_normal_boo <- sd(skew_bootstrap)
 el2_original_skew <- e1071::skewness(z_n_clean, type = 1)
 el2_bias <- mean(skew_bootstrap) - el2_original_skew
 
 #------------ statistics/metrics
 # calculating quantile based confidence interval
-print(quantile(skew_bootstrap, probs = c(0.025, 0.975)))
-print(quantile(skew_normal_sim, probs = c(0.025, 0.975)))
+ci_95_skew_zn_boot_quantile <- quantile(skew_bootstrap, probs = c(0.025, 0.975))
+ci_95_skew_normals_quantile <- quantile(skew_normal_sim, probs = c(0.025, 0.975))
+# 
+# print(ci_95_skew_zn_boot_quantile)
+# print(ci_95_skew_normals_quantile)
 
 
 # Using open source: https://gitlab.com/scottkosty/bootstrap/-/blob/master/R/bcanon.R
@@ -881,19 +895,19 @@ bca_skew <- bcanon(
   type  = 1
 )
 
-# calculating quantile based confidence interval
-print(quantile(skew_bootstrap, probs = c(0.025, 0.975)))
-print(quantile(skew_normal_sim, probs = c(0.025, 0.975)))
+# # calculating quantile based confidence interval
+# print(ci_95_skew_zn_boot_quantile)
+# print(ci_95_skew_normals_quantile)
 
 # alpha and corresponding BCa points
-print(bca_skew$confpoints)
+# print(bca_skew$confpoints)
 
 skew_boot_full <- replicate(
   N_reps,
   e1071::skewness(sample(z_n_clean, length(z_n_clean), replace = TRUE), type = 1)
 )
 
-quantile(skew_boot_full, c(0.025, 0.975))
+# quantile(skew_boot_full, c(0.025, 0.975))
 
 #------------ 95% CIs for comparison ----------
 
@@ -1078,6 +1092,7 @@ kable(
 # ==============================================================================
 #--------------- Element 4: investigation of constant variance ----------------#
 # ==============================================================================
+
 variances <- sapply(z_list, var, na.rm = TRUE)
 min_var_loc <- which.min(variances)
 max_var_loc <- which.max(variances)
@@ -1370,6 +1385,7 @@ kable(
 # ==============================================================================
 #------------------- Element 5: independence of increments --------------------#
 # ==============================================================================
+
 # Create a $z_{n-1}$ series
 z_lag <- stats::lag(z_n_clean, k = 1)
 
@@ -1394,15 +1410,15 @@ con_table <- table(z_n_minus_1_cat, z_n_cat)
 
 # statistical test (want Chi-squared, but need to see if cell frequencies are >5)
 chisq_result <- chisq.test(con_table)
-chisq_result
-chisq_result$expected
-# If any expected counts are low (R will often produce a warning), the $\chi^2$ p-value is unreliable.
-# may then want to use Fisher's Exact Test
+# chisq_result
+# chisq_result$expected
+
+# If any expected counts are low (R will often produce a warning), 
+# the $\chi^2$ p-value is unreliable may then want to use Fisher's Exact Test
 if (any(chisq_result$expected < 5)) {
   fisher_result <- fisher.test(con_table)
   fisher_result
 }
-#
 
 con_table_df <- as.data.frame.matrix(con_table)
 
@@ -1427,6 +1443,7 @@ kable(
 # ==============================================================================
 #------------------- Element 6: general upwardness of trend -------------------#
 # ==============================================================================
+
 num_positive <- sum(z_n_clean > 0)
 total_days <- length(z_n_clean)
 # test using binomial (could also approximate, but Russell normally says
@@ -1454,6 +1471,108 @@ mean_neg_run <- mean(neg_run_lengths)
 # Onesided here I think
 
 wilcox_res <- wilcox.test(pos_run_lengths, neg_run_lengths, alternative = "greater")
+
+# ==============================================================================
+#----------------------- Appendix: determining outliers -----------------------#
+# ==============================================================================
+
+# Concept: use full range of Nasdaq data (i.e., since the 1970s) then plot 
+# volatility and identify threshold to use to select outlier regions from our 
+# time period
+threshold_annual_volitility <- 0.70
+
+nasdaq_data_full <- data.frame(
+  date = index(IXIC_full),
+  price = as.numeric(Cl(IXIC_full))
+) %>%
+  arrange(date) %>%
+  mutate(
+    log_ret = c(NA, diff(log(price))),
+    # Get annualised volatility (*252) for no. of trading days per year
+    volitility_20d = runSD(log_ret, n = 20) * sqrt(252),
+    volitility_60d = runSD(log_ret, n = 60) * sqrt(252)
+  ) %>%
+  filter(!is.na(volitility_20d)) %>%
+  filter(!is.na(volitility_60d))
+
+# Get percentiles for breaches of threshold defined above
+vol_percentiles <- quantile(
+  nasdaq_data_full$volitility_20d,
+  probs = c(0.90, 0.95, 0.99, 0.995),
+  na.rm = TRUE
+)
+
+# get dates where 20d vol > threshold
+nasdaq_breaches_full <- nasdaq_data_full %>%
+  filter(volitility_20d > threshold_annual_volitility) %>%
+  select(date, volitility_20d)
+
+# print("Major Crash Dates detected:")
+# nasdaq_breaches_full
+
+#----------- Appendix Figure: full nasdaq rolling 20day volatility ------------#
+appendix_p1 <- ggplot(nasdaq_data_full, aes(x = date)) +
+  geom_line(aes(y = volitility_20d, color = "20-Day"), size = 0.3) +
+  # geom_line(aes(y = volitility_60d, color = "60-Day"), size = 0.6, alpha = 0.8) +
+  geom_hline(yintercept = threshold_annual_volitility, linetype = "dashed", color = "black") +
+  annotate(
+    "text",
+    x = as.Date("1975-01-01"),
+    y = threshold_annual_volitility+0.1,
+    label = paste0("Threshold (", threshold_annual_volitility, ")"),
+    size = 3
+  ) +
+  scale_color_manual(values = c("20-Day" = "black", "60-Day" = "blue")) +
+  labs(
+    title = paste0(
+      "Nasdaq Composite Volatility (", 
+      trading_period_days, 
+      "-day rolling window)"
+      ),
+    x = "Date",
+    y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+  ) +
+  # not visible when included so commented out
+  # outlier_shading +
+  ylim(0.01, 0.99) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# plot 2 (zoomed)
+appendix_p2 <- ggplot(
+  filter(nasdaq_data_full, date >= "2018-01-01" & date <= "2025-12-31"),
+  aes(x = date)
+) +
+  geom_line(aes(y = volitility_20d, color = "20-Day"), size = 0.5) +
+  # geom_line(aes(y = volitility_60d, color = "60-Day"), size = 0.8, alpha = 0.8) +
+  # covid shading
+  outlier_shading +
+  # annotate(
+  #   "text",
+  #   x = as.Date("2020-03-01"), y = 0.9,
+  #   label = "COVID Exclusion",
+  #   color = "black", size = 3, hjust = 0
+  # ) +
+  scale_color_manual(values = c("20-Day" = "black", "60-Day" = "blue")) +
+  labs(
+    title = paste0(
+      "Nasdaq Composite Volatility (", 
+      trading_period_days, 
+      "-day rolling window)"
+      ),
+    x = "Date",
+    y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+  ) +
+  ylim(0.01, 0.99) +
+  # theme(legend.position = "none") +
+  theme_minimal()
+
+(appendix_p1 / appendix_p2) &
+  theme(
+    plot.title  = element_text(hjust = 0.5),
+    plot.margin = margin(5.5, 5.5, 5.5, 5.5),
+    legend.position = "none"
+  )
 
 knitr::include_graphics("fig/appendix-COVID19-selection.pdf")
 
