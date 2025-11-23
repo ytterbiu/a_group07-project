@@ -39,7 +39,15 @@ bibliography: references.bib
 
 ## Executive summary
 
-Summary / Abstract TBI here...
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. In ullamcorper dapibus
+ante, dignissim pharetra justo consequat nec. Curabitur tempus nulla in augue
+auctor, imperdiet eleifend enim elementum. Nulla facilisi. Integer sed metus non
+justo semper posuere eu sit amet odio. Nullam sodales auctor justo, convallis
+tempor lectus feugiat ut. Quisque et ligula et tellus placerat consequat eu vel
+magna. Vivamus et arcu nulla. Quisque ullamcorper eu odio nec facilisis. Proin
+ac commodo nibh. In hac habitasse platea dictumst. Sed tincidunt porttitor
+maximus. Nunc ullamcorper aliquet consequat. Vestibulum porta, justo auctor
+imperdiet porta, nulla mi gravida tortor, et mattis tortor diam.
 
 ```{=html}
 <!-- ## Key Information
@@ -204,6 +212,17 @@ format_p_vals <- function(p) {
   } else {
     "< 0.001"
   }
+}
+#####################################
+# function: format confidence intervals for tables & text 
+# Usage (in-line): `r format_interval(el2_ci_normal_95[1], el2_ci_normal_95[2])`
+# Usage (console): format_interval(el2_ci_normal_95[1], el2_ci_normal_95[2])
+#####################################
+format_interval <- function(lower, upper, digits=3) {
+  paste0("[", 
+       formatC(lower, format = "f", digits = digits), ", ",
+       formatC(upper, format = "f", digits = digits), 
+       "]")
 }
 ```
 
@@ -684,25 +703,6 @@ desc_z_n_clean <- tibble(
   mutate(Value = sprintf("%.6f", Value))
 ```
 
-```{r zn-desc, echo=FALSE, message=FALSE, warning=FALSE}
-kable(
-  desc_z_n_clean,
-  # caption = "Descriptive statistics of cleaned log returns ($z_n$).",
-  caption = paste0(
-    "Descriptive statistics of cleaned Nasdaq log returns (n = ", 
-    format(length(z_n_clean), big.mark = ","), 
-    "). Skewness and kurtosis were calculated using Type 1 estimators. Given the large sample size, differences compared to bias-corrected (Type 2 or 3) estimators are negligible."
-  ),
-  booktabs = TRUE,
-  align = c("l", "r"),
-  escape = FALSE
-) |>
-  kable_styling(
-      full_width = FALSE, 
-      position = "center", 
-      latex_options = "hold_position"
-    )
-```
 
 ```{r zn-desc-ad, echo=FALSE, message=FALSE, warning=FALSE, include = FALSE}
 #- Element 1 - (bonus) Table with type 2 & 3 estimators (not used in report) --#
@@ -750,14 +750,34 @@ ad_test_result
 ```
 
 Nasdaq Composite adjusted closing prices (2018–2024) were reviewed to identify
-periods of volatility unrelated to legitimate market activity (Figure
+periods of volatility unrelated to 'legitimate' market activity (Figure
 \@ref(fig:timeline-fig)).[^legit-market] Following numerical analysis and
-qualitative review, only the onset of the COVID-19 pandemic was excluded as a
-non-representative outlier. Figure
+qualitative review, only the onset of the COVID-19 pandemic
+(24/02/2020-23/03/2020) was excluded as a non-representative outlier. Figure
 \@ref(fig:initial-data-visualisation-volatility-and-regions-to-remove) shows the
 Nasdaq adjusted close over this period and the period selected for exclusion.
 Further details regarding the exclusion selection process are discussed in
 Appendix \S\@ref(apd-outlier-selection).
+
+```{r zn-desc, echo=FALSE, message=FALSE, warning=FALSE}
+kable(
+  desc_z_n_clean,
+  # caption = "Descriptive statistics of cleaned log returns ($z_n$).",
+  caption = paste0(
+    "Descriptive statistics of cleaned Nasdaq log returns (n = ", 
+    format(length(z_n_clean), big.mark = ","), 
+    "). Skewness and kurtosis were calculated using Type 1 estimators. Given the large sample size, differences compared to bias-corrected (Type 2 or 3) estimators are negligible."
+  ),
+  booktabs = TRUE,
+  align = c("l", "r"),
+  escape = FALSE
+) |>
+  kable_styling(
+      full_width = FALSE, 
+      position = "center", 
+      latex_options = "hold_position"
+    )
+```
 
 As shown in Table \@ref(tab:zn-desc), the resulting daily log-returns ($Z_n$) 
 exhibit pronounced excess kurtosis
@@ -785,7 +805,7 @@ hypothesis ($H_0$). The Anderson-Darling test provides strong evidence that the
 Nasdaq log-returns are not normally distributed.
 
 
-```{r timeline-fig, echo=FALSE, fig.cap="Notable Nasdaq market events from 2018-2024. Only the period associated with COVID-19 met the numerical criteria for a systemic outlier.", out.width="80%", fig.align='center', out.width="100%"}
+```{r timeline-fig, echo=FALSE, fig.cap="Notable Nasdaq market events from 2018-2024. Only the period associated with COVID-19 met the numerical criteria for a systemic outlier (see Appendix A for more information).", out.width="80%", fig.align='center', out.width="100%"}
 knitr::include_graphics("fig/timeline2.pdf")
 ```
 
@@ -958,6 +978,7 @@ initial_vis_p4 <- ggplot(df_clean, aes(date, z_n)) +
 ```
 
 ```{=latex}
+\clearpage
 \newpage
 ```
 
@@ -982,18 +1003,8 @@ initial_vis_p4 <- ggplot(df_clean, aes(date, z_n)) +
 <!-- sets of_ $\hat{\gamma}$ values. Comment on what you observe and whether the -->
 <!-- outcome of your tests confirms the result of the test of normality. -->
 
-### Simulating skewness from resampling a normal distribution & from $z$-data using bootstrapping
+<!-- ### Simulating skewness from resampling a normal distribution & from $z$-data using bootstrapping -->
 
-Idea: compare the sampling distribution of skewness from the data against the
-sampling distribution of skewness from a true normal distribution, using the
-parameters from `IXIC` data.
-
-We are told to use a small n ($n=13$) so would expect non-normal despite
-underlying data being normal.
-
-Idea: then repeat this process using bootstrapping and z-data.
-
-Non-parametric bootstrap...
 ```{r Element 2, echo=FALSE}
 # ==============================================================================
 #------------ Element 2: investigation of normality by resampling -------------#
@@ -1010,11 +1021,19 @@ N_reps <- 50000
 n_sample_size <- 13
 
 # Simulate 50,000 skewness values using sample size of 13
+#   Generate 13 values normally distributed with (z_mean, z_sd) 
+#   Calculate skewness of these 13 values
+#   Repeat process 50,000 times
+#   Tells one how much noise one would expect given this small sample size (13)
 skew_normal_sim <- replicate(
   N_reps, e1071::skewness(rnorm(n_sample_size, z_mean, z_sd), type = 1)
   )
 
 # bootstrapping skewness simulation
+#   Pick 13 values from z_n_clean (with replacement)
+#   Calculate skewness of these 13 values
+#   Repeat process 50,000 times
+#   Looking at skewness if we just take 13 random days of data
 skew_bootstrap <- replicate(
   N_reps, e1071::skewness(sample(z_n_clean, n_sample_size, replace = TRUE), type = 1)
   )
@@ -1036,7 +1055,7 @@ ci_95_skew_normals_quantile <- quantile(skew_normal_sim, probs = c(0.025, 0.975)
 # print(ci_95_skew_normals_quantile)
 ```
 
-```{r el2-testing, echo=FALSE, cache = FALSE}
+```{r el2-full-bootstrap, echo=FALSE, cache = FALSE}
 
 # Using open source: https://gitlab.com/scottkosty/bootstrap/-/blob/master/R/bcanon.R
 #
@@ -1098,25 +1117,20 @@ ci_95_skew_normals_quantile <- quantile(skew_normal_sim, probs = c(0.025, 0.975)
 ```{r bca-interval-bcanon, echo=FALSE, cache = FALSE}
 
 #------------ BCa interval for skewness using bcanon
-bca_skew <- bcanon(
-  x     = z_n_clean,
-  nboot = N_reps,
-  alpha = c(.025,.975),
-  theta = e1071::skewness,
-  type  = 1
-)
-
+# bca_skew <- bcanon(
+#   x     = z_n_clean,
+#   nboot = N_reps,
+#   alpha = c(.025,.975),
+#   theta = e1071::skewness,
+#   type  = 1
+# )
+# 
 # # calculating quantile based confidence interval
 # print(ci_95_skew_zn_boot_quantile)
 # print(ci_95_skew_normals_quantile)
-
+# 
 # alpha and corresponding BCa points
 # print(bca_skew$confpoints)
-
-skew_boot_full <- replicate(
-  N_reps,
-  e1071::skewness(sample(z_n_clean, length(z_n_clean), replace = TRUE), type = 1)
-)
 
 # quantile(skew_boot_full, c(0.025, 0.975))
 
@@ -1128,7 +1142,15 @@ el2_ci_normal_95 <- quantile(skew_normal_sim, probs = c(0.025, 0.975))
 # Bootstrap percentile CI from empirical data, n = 13
 el2_ci_boot_95 <- quantile(skew_bootstrap, probs = c(0.025, 0.975))
 
-# (bonus) BCa bootstrap CI for skewness using full data, n = 1651
+# (bonus) bootstrap 9% CI for skewness using full data, n = ~1737
+# using standard percentile
+skew_boot_full <- replicate(
+  N_reps,
+  e1071::skewness(sample(z_n_clean, length(z_n_clean), replace = TRUE), type = 1)
+)
+el2_ci_boot_full_perc <- quantile(skew_boot_full, probs = c(0.025, 0.975))
+
+# using bcanon BCa
 bca_skew <- bcanon(
   x     = z_n_clean,
   nboot = N_reps,
@@ -1136,56 +1158,95 @@ bca_skew <- bcanon(
   type  = 1,
   alpha = c(0.025, 0.975)
 )
-
-el2_ci_bca_95 <- bca_skew$confpoints[, "bca point"]
+el2_ci_boot_full_bca <- bca_skew$confpoints[, "bca point"]
 
 ci_table <- data.frame(
-  Method = c(
-    "Simulated normal percentile",
-    "Bootstrap percentile",
-    "BCa bootstrap (full data)"
+  Dataset = c(
+    "Small Sample (n=13)",
+    "Small Sample (n=13)",
+    "Full Data (n=1737)",
+    "Full Data (n=1737)"
   ),
-  N = c(
-    n_sample_size,
-    n_sample_size,
-    length(z_n_clean)
+  Method = c(
+    "Simulated Normal (Control)",
+    "Bootstrap Percentile",
+    "Bootstrap Percentile",
+    "BCa Bootstrap (Robust)"
   ),
   Lower = c(
     el2_ci_normal_95[1],
-    el2_ci_boot_95[1],
-    el2_ci_bca_95[1]
+    el2_ci_boot_95[1],        
+    el2_ci_boot_full_perc[1],
+    el2_ci_boot_full_bca[1]
   ),
   Upper = c(
     el2_ci_normal_95[2],
-    el2_ci_boot_95[2],
-    el2_ci_bca_95[2]
+    el2_ci_boot_95[2],        
+    el2_ci_boot_full_perc[2],
+    el2_ci_boot_full_bca[2]
   )
+)
+
+ci_table_2_digits <- 2
+ci_table_2 <- data.frame(
+  Dataset = c(
+    "Small Sample",
+    "Small Sample",
+    "Full Data",
+    "Full Data"
+  ),
+  Method = c(
+    "Simulated Normal",
+    "Bootstrap Percentile",
+    "Bootstrap Percentile",
+    "Bootstrap BCa"
+  ),
+  N = c(
+    n_sample_size,        
+    n_sample_size,        
+    length(z_n_clean),    
+    length(z_n_clean)     
+  ),
+  `95 percent CI` = c(
+    format_interval(el2_ci_normal_95[1], el2_ci_normal_95[2], ci_table_2_digits),
+    format_interval(el2_ci_boot_95[1], el2_ci_boot_95[2], ci_table_2_digits),
+    format_interval(el2_ci_boot_full_perc[1], el2_ci_boot_full_perc[2], ci_table_2_digits),
+    format_interval(el2_ci_boot_full_bca[1], el2_ci_boot_full_bca[2], ci_table_2_digits)
+  ),
+  check.names = FALSE
 )
 ```
 
-```{r skewness-95CI, echo=FALSE, message=FALSE, warning=FALSE}
-kable(
-  ci_table,
-  caption = "Comparison of 95 percent confidence intervals for skewness under different approaches.",
-  booktabs = TRUE,
-  align = c("l", rep("r", 3)),
-  digits = 3,
-  row.names = FALSE,
-  escape = FALSE
-) |>
-  add_header_above(
-    c(" " = 2, "95 percent CI" = 2),
-    escape = FALSE
-  ) |>
-  kable_styling(full_width = FALSE, position = "center")
-```
+To assess the normality assumption under small-sample
+constraints (n=13), the sampling distribution of the coefficient of
+skewness ($\hat{\gamma}_1$) was simulated using 50,000 replications. This
+process involved generating a baseline control from a theoretical normal
+distribution and comparing it against an empirical set bootstrapped directly
+from the Nasdaq log-returns.
 
-### Visual comparison and interpretation
+Figure \@ref(fig:skewness-densities) compares a theoretical normal baseline
+against an empirical bootstrap from the observed data. The theoretical
+distribution is centred at zero with a 95% Confidence Interval (CI) of 
+`r format_interval(el2_ci_normal_95[1], el2_ci_normal_95[2], 2)`. In contrast, 
+the empirical distribution exhibits a negative shift and notably heavier tails,
+producing a wider 95% CI of 
+`r format_interval(el2_ci_boot_95[1], el2_ci_boot_95[2], 2)`. 
+While this interval includes zero, this likely reflects
+the low statistical power of the sample size rather than underlying normality
+[@bickel1997resampling].
 
-An overlapping density plot was used to illustrate the differences between the
-two skewness simulations.
+To address this limitation, the full dataset (n=`r length(z_n_clean)`) was
+analysed using the Bias-Corrected and accelerated (BCa) bootstrap. Unlike
+standard percentile methods which assume symmetry, the BCa algorithm
+[@efron1993introduction] (implemented in R by @kosty2019bcanon) adjusts for the
+estimator’s inherent bias and skewness. This robust analysis returned a 95% CI
+of
+`r format_interval(el2_ci_boot_full_bca[1], el2_ci_boot_full_bca[2], 3)`. 
+The exclusion of zero confirms significant negative skewness, corresponding to 
+a risk of extreme negative events. In a random 13-day observation window, this 
+finding was masked by the high noise inherent in small samples.
 
-```{r skewness-densities, echo=FALSE, fig.cap = paste0("Sampling distributions of the skewness estimator for ",N_reps, " samples of size n=", n_sample_size, " taken from a Normal model (blue) and from the empirical log-returns $z_n$ via bootstrap (red).")}
+```{r skewness-densities, echo=FALSE, fig.cap = paste0("Sampling distributions of the skewness estimates for ",N_reps, " samples of size n=", n_sample_size, " taken from a Normal model (blue) and from the empirical log-returns $z_n$ via bootstrap (red)."), fig.pos='!ht'}
 
 # bootstrapping skewness simulation
 skew_df <- data.frame(
@@ -1207,44 +1268,49 @@ ggplot(skew_df, aes(x = skewness, fill = Source)) +
   )
 ```
 
-As shown in Figure \@ref(fig:skewness-densities), the "Simulated Normal"
-distribution is roughly centred on 0. The "Bootstrap Data" distribution is
-slightly shifted to the left (lower than 0) (indicating the data's inherent
-skew) and is it wider, with fatter tails.
 
-!BE note: Here we have done two separate things.
+<!-- [@efronbootstrap1979] -->
+<!-- [@efron1987better] -->
+<!-- [@bickel1997resampling] -->
+<!-- [@kosty2019bcanon] -->
+<!-- [@efron1993introduction] -->
 
-- The first is the task specified in the document, bootstrapping the data using
-  a subsampling approach (sometimes called m-out-of-n)
-- The second is bootstrapping the data using the full data
+```{r skewness-95CI, echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+kable(
+  ci_table,
+  caption = "Comparison of 95% Confidence Intervals for skewness across sample sizes and methods. The ",
+  booktabs = TRUE,
+  align = c("l", rep("r", 3)),
+  digits = 3,
+  row.names = FALSE,
+  escape = FALSE
+) |>
+  add_header_above(
+    c(" " = 2, "95 percent CI" = 2),
+    escape = FALSE
+  ) |>
+  kable_styling(full_width = FALSE, position = "center")
+```
 
-- I think our data are iid (independent and identically distributed - confirmed
-  in lab 2), or we can assume as much. We are estimating skewness -> I think the
-  n-out-of-n (or full) bootstrap can be used.
-  - Generally for CI
+```{r skewness-95CI-2, echo=FALSE, message=FALSE, warning=FALSE}
+kable(
+  ci_table_2,
+  caption = "Comparison of 95 percent confidence intervals for skewness across sample sizes and methods. The simulated normal sample is a baseline control derived from a theoretical normal distribution with a small sampling size, the bootstrap percentile intervals are calculated directly from the empirical 2.5th and 97.5th quantiles, while the Bootstrap BCa interval employs bias correction and acceleration to adjust for the inherent asymmetry of the estimator, offering the most robust metric for the full dataset.",
+  booktabs = TRUE,
+  align = c("l", "l", "r", "l"),
+  digits = 3,
+  row.names = FALSE,
+) %>%
+  kable_styling(
+    full_width = FALSE, 
+    position = "center",
+    latex_options = "hold_position"
+    )
+```
 
-The implementation for this report utilised caching to store the R objects
-generated in a code chunk to a cache database.
-
-Refs to use, for jackknife bootstrap
-
-- https://sites.stat.washington.edu/courses/stat527/s14/readings/ann_stat1979.pdf
-- (general bootstrap intervals)
-  https://projecteuclid.org/journals/statistical-science/volume-11/issue-3/Bootstrap-confidence-intervals/10.1214/ss/1032280214.pdf
-
-The sampling distribution of skewness under the simulated Normal condition is
-approximately centred at 0, as expected. The bootstrap distribution based on the
-observed $z_{n}$ data is shifted to the left (mid-point \<0), reflecting a
-negative skew, and is noticeably more dispersed with heavier tails.
-
-The small samples drawn from the empirical $z_n$ distribution tend to produce
-more extreme and variable skewness values than one would expect under a normal
-assumption with the same mean and variance, even accounting for the small sample
-size. This observation is in agreement with the Anderson-Darling test
-(\S\@ref(elementOne)) and provides further evidence against an assumption
-of normality for these data.
 
 ```{=latex}
+\clearpage
 \newpage
 ```
 
@@ -1430,6 +1496,7 @@ $H_0$, that (!TBI). This finding is consistent with the assumption of a constant
 mean (or median) log-return over time.
 
 ```{=latex}
+\clearpage
 \newpage
 ```
 
@@ -1815,6 +1882,11 @@ Know that have to be careful about the statements made here.
 
 <!-- respectively. -->
 
+```{=latex}
+\clearpage
+\newpage
+```
+
 ## Independence of increments {#elementFiv}
 
 <!-- ### Instructions (to be removed later) -->
@@ -1947,6 +2019,7 @@ classification of $z_{n-1}$ and this finding does not not support the Efficient
 Markets Hypothesis.
 
 ```{=latex}
+\clearpage
 \newpage
 ```
 
@@ -2193,7 +2266,7 @@ Using the full history of the Nasdaq Composite (1971–2024), the annualised
 20-day rolling volatility was calculated to benchmark the 2018–2024 study period
 against historical extremes (Figure \@ref(fig:nasdaqAllTimeVol)).
 
-```{r nasdaqAllTimeVol, eval = TRUE, echo = FALSE, fig.height=4.4, fig.pos='!ht', fig.cap="Nasdaq Composite index price volatility from 1971-2024. The dotted line shows the volatility threshold applied to identify outliers and the red shaded region indicates the excluded window in 2018-2024 associated with the COVID-19 pandemic."}
+```{r nasdaqAllTimeVol, eval = TRUE, echo = FALSE, fig.height=4.4, fig.pos='!ht', fig.cap="Nasdaq Composite index price volatility from 1971-2024. The dotted line shows the volatility threshold applied to identify outliers and the red shaded region indicates the excluded window in 2018-2024 associated with the COVID-19 pandemic. Note that the volatility metric peaks after the excluded region due to the lag inherent in a trailing 20-day calculation."}
 #----------- Appendix Figure: full nasdaq rolling 20day volatility ------------#
 appendix_p1 <- ggplot(nasdaq_data_full, aes(x = date)) +
   geom_line(aes(y = volitility_20d, color = "20-Day"), size = 0.3) +
@@ -2261,12 +2334,12 @@ appendix_p2 <- ggplot(
 
 A threshold of 0.70 (70% annualised volatility) was selected. Note that
 annualised volatility can exceed 100%. This metric represents the standard
-deviation of daily log-returns scaled to an annual timeframe ($\sigma_{ann} =
-\sigma_{daily} \times \sqrt{252}$).
-
-As shown in Figure \@ref(fig:nasdaqAllTimeVol), this threshold acts as
-a robust historical filter. Over the last 50 years, breaches of the 0.70 level
-isolate only five distinct 'systemic shock' events:
+deviation of daily log-returns scaled to an annual timeframe 
+$$
+\sigma_{ann} = \sigma_{daily} \times \sqrt{252}
+$$
+As shown in Figure \@ref(fig:nasdaqAllTimeVol), breaches of the 0.70 level
+isolate only five distinct 'systemic shock' events over the last 50 years:
 
 1. Black Monday (1987)
 2. The Dot-Com Bubble Burst (2000)
@@ -2274,42 +2347,46 @@ isolate only five distinct 'systemic shock' events:
 4. The Global Financial Crisis (2008)
 5. The COVID-19 Pandemic (2020)
 
-This rarity is statistically corroborated by the fact that the 0.70 threshold
-corresponds to the 
-`r formatC(vol_percentiles['99.5%'], format="fg", digits=3)`th percentile of 
-all trading days since 1971.
+The five events that breach the 0.70 threshold correspond to the
+`r formatC(vol_percentiles['99.5%'], format="fg", digits=3)`th 
+percentile of all trading days since 1971. Other periods of interest within the
+2018-2024 window, noted in Figure \@ref(fig:timeline-fig), such as the
+"Christmas Eve Massacre" (2018), the Trade War shocks (2019), and the Inflation
+Bear Market (2022), did not breach the 0.70 threshold and fall into the category
+of legitimate and 'standard' market activity for the purposes of this report.
 
-There is, therefore, strong numerical evidence to characterise the onset of the
-COVID-19 pandemic as a non-representative outlier (or a period which falls
-outside of the definition of 'legitimate market activity'). Other periods of
-volatility in the 2018-2024 window noted in Figure \@ref(fig:timeline-fig), such
-as the "Christmas Eve Massacre" (2018), the Trade War shocks (2019), and the
-Inflation Bear Market (2022), did not breach this threshold. These periods fall 
-into the category of legitimate and 'standard' market activity and were not 
-excluded.
+<!-- There is strong quantitative evidence to characterise the onset of the COVID-19 -->
+<!-- pandemic as a non-representative outlier (or a period which falls outside of our -->
+<!-- definition of 'legitimate market activity').  -->
+
 
 ### Technical boundary definition
 
 While the volatility threshold flagged the 2020 COVID period as a systemic
 anomaly, relying solely on a rolling metric can result in imprecise window
-boundaries due to lag effects. Therefore, to define the exact start and end
-dates of the exclusion window, technical trend line analysis was applied to the
-daily price action (Figure \@ref(fig:covid-trend-lines)).
+boundaries due to lag effects. To define the exact start and end dates of the
+exclusion window, technical trend line analysis was applied to the daily price
+action (Figure \@ref(fig:bloomberg-trends)).
 
-Rough notes:
+The pre-pandemic market followed a consistent bullish trajectory, delineated by
+the upward trend line LU1. The onset of the exclusion window was defined as
+24 February 2020 ("Point A"). On this date, the closing price structurally
+breached LU1 to the downside. This technical breakdown coincided with
+significant geopolitical escalations, specifically the declaration of a national
+lockdown in Italy and subsequent mitigating measures announced by the US Centers
+for Disease Control and Prevention. Following the breach, the market entered a
+phase of panic selling captured by the steep downward trend line LD1. This trend
+encompassed the declaration of a US nationwide emergency on 13th March 2025. The
+end of this volatility period was identified as 23 March 2020 ("Point B").
+At this point, the closing price breached the downward trend line LD1 to the
+upside. Post-breach analysis indicates a resumption of a stable bullish
+trajectory (trend line LU2), suggesting a return to standard market mechanics.
 
-- LU 1 – shows existing pre-COVID up trend
-- LD L1 shows - panic selling induced down trend.
-- 24rd Feb 2020 uptrend shown by line LU1 was breached as shown by point A.
-- This was right after Italy declaring lockdown.
-- 25th Feb 2020 – US CDC Telebriefing indicating mitigating measures.
-- 13 March 2020 – Trump Administration declares nationwide emergency.
-- 23rd March 2020 down trend shown by line LD1 was breached as shown by point B.
-- We can assume the market has absorbed the shock of announcement of COVID-19.
-- Line LU2 Captures on upcoming Uptrend
+The dates from 2018-2024 excluded for the analysis in this report were 
+24 February 2020 to 23 March 2020.
 
-```{r covid-trend-lines, echo=FALSE, out.width="70%", fig.cap="Changes in the Nasdaq Composite index from x – y.  Analysis was carried out to..."}
-knitr::include_graphics("fig/appendix-COVID19-selection.pdf")
+```{r bloomberg-trends, echo=FALSE, out.width="100%", fig.cap="Technical trend analysis of the Nasdaq Composite index via the Bloomberg Terminal interface (Jul 2019–Aug 2021). The exclusion window is bounded by two structural breaks, the violation of the pre-pandemic uptrend (LU1) at Point A (Feb 24, 2020) and the conclusion of the panic-selling downtrend (LD1) at Point B (Mar 23, 2020), after which a recovery trend (LU2) is established."}
+knitr::include_graphics("fig/appendix-COVID19-selection-3.pdf")
 ```
 
 <!-- tools::showNonASCIIfile("your_file.Rmd") -->
@@ -2412,7 +2489,7 @@ a comprehensive timeline of all contributions by group members.
 
 Generative AI (GenAI) tools were used to assist with project planning,
 methodological validation, and R debugging throughout this project. The GenAI
-tools served as a additional group member in this capacity.
+tools served as an additional group member in this capacity.
 
 ### Tools Used
 
@@ -2510,11 +2587,12 @@ introduction, elements 1-6, and the conclusion.
     additive inverse of a move from $200 to $100 ( log-return of −0.693).
 
 [^cont2001quote]:
-    A 'stylized empirical fact' was defined by @Cont01022001 as being
+    A 'stylized empirical fact' is defined by @Cont01022001 as being
     "properties common across a wide range of instruments, markets and time
     periods" [@Cont01022001 pp. 224]
 
 [^legit-market]:
     We acknowledge that what constitutes “legitimate” market activity is itself
-    debatable. 
+    debatable. This is discussed further in Appendix 
+    \S\@ref(apd-outlier-selection).
 
