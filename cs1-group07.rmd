@@ -1326,15 +1326,7 @@ kable(
 <!-- decide to use ANOVA for your test you will need to comment on the Normality, or -->
 <!-- otherwise, of your 7 subsamples.] -->
 
-### Visual comparison of means
-
-Want to test second core assumption that the log-returns $z_n$ have a constant
-mean $\mu$\dots
-
-Want to use split() function to divide the data by time periods to create a list
-of 14 xts objects, each representing a 6-month period. The number of data points
-per six-month period is shown in Table \@ref(tab:days-per-six-month-period),
-located in the Appendix.
+<!-- ### Visual comparison of means -->
 
 ```{r Element 3, echo=FALSE}
 # ==============================================================================
@@ -1342,7 +1334,7 @@ located in the Appendix.
 # ==============================================================================
 ```
 
-```{r Element 3 pt1 - TBC, echo = FALSE}
+```{r Element 3 pt1 - setup, echo = FALSE}
 # # ---------------- attempt 01: using flexible 6 month windows
 # # split z data into 14 subsamples
 # z_list <- split(z_n_clean, f = "months", k = 6)
@@ -1412,19 +1404,26 @@ combined_df_el3 <- bind_rows(lapply(seq_along(z_list), function(i) {
 }))
 ```
 
-```{r element3-boxplot, echo=FALSE, fig.cap = "TBC: boxplots showing log-returns of IXJKFLDS! over six-month periods."}
-ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
-  geom_boxplot() +
-  theme_bw() +
-  labs(
-    title = "Log-returns over six-month periods",
-    x = "Six-month period",
-    y = expression(z[n])
-  ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```{r element3-days-per-six-month-period, echo=FALSE, message=FALSE, warning=FALSE}
+#---------- Element 4: check & count observations in 6-month periods ----------#
+# Count observations in each 6-month period
+days_per_period <- sapply(z_list, NROW)
+
+period_labels <- names(days_per_period)
+
+# split into start/end strings
+start_dates <- sub(" -.*", "", period_labels)
+end_dates   <- sub(".*- ", "", period_labels)
+
+days_table <- data.frame(
+  `Start date`             = start_dates,
+  `End date`               = end_dates,
+  `Number of data entries` = as.integer(days_per_period),
+  check.names = FALSE
+)
 ```
 
-### Statistical test
+<!-- ### Statistical test -->
 
 ```{r kruskal-test, echo = FALSE}
 kruskal_res <- kruskal.test(z_value ~ Period, data = combined_df_el3)
@@ -1453,6 +1452,23 @@ kable(
   kable_styling(full_width = FALSE, position = "center")
 ```
 
+
+Want to test second core assumption that the log-returns $z_n$ have a constant
+mean $\mu$\dots
+
+@hollander2013nonparametric
+
+
+
+Want to use split() function to divide the data by time periods to create a list
+of 14 xts objects, each representing a 6-month period. The number of data points
+per six-month period is shown in Table \@ref(tab:days-per-six-month-period).
+
+The log-returns were split into fourteen  6-month periods (Table
+\@ref(tab:days-per-six-month-period)). Although the Jan 2020–Jun 2020 window
+contains relatively fewer observations, we assume it remains representative of
+the index’s behaviour.
+
 From \S\@ref(elementOne) & \@ref(elementTwo) we know that our data cannot be
 treated as being normally distributed/shows strong departures from Normality. We
 therefore opted to use a non-parametric alternative to one-way ANOVA.
@@ -1474,18 +1490,18 @@ hypothesis ($H_0$) is that the medians of all 14 groups are equal.
 
 Kruskal–Wallis: The hypotheses are defined as:
 
-$$
-\begin{cases}
-H_0: \text{The distributions of the 14 subsamples are identical} & (F_1 = F_2 = \dots = F_{14}) \\
-H_1: \text{At least one subsample tends to yield larger values} & (\exists i,j: P(X_i > X_j) > 0.5)
-\end{cases}
-$$
-OR
+<!-- $$ -->
+<!-- \begin{cases} -->
+<!-- H_0: \text{The distributions of the 14 subsamples are identical} & (F_1 = F_2 = \dots = F_{14}) \\ -->
+<!-- H_1: \text{At least one subsample tends to yield larger values} & (\exists i,j: P(X_i > X_j) > 0.5) -->
+<!-- \end{cases} -->
+<!-- $$ -->
+<!-- OR -->
 $$
 \begin{cases}
 H_0: \text{The distributions of the 14 samples are identical} \\
 H_1: \text{At least one sample comes from a distribution that tends} \\ 
-\quad \ \ \text{to produce larger or smaller values than the others}
+\qquad\, \text{to produce larger or smaller values than the others}
 \end{cases}
 $$
 
@@ -1494,6 +1510,37 @@ differences in the typical (central) log-return across the periods
 (p=`r signif(kruskal_res$p.value, 3)`). We therefore accept the null hypothesis,
 $H_0$, that (!TBI). This finding is consistent with the assumption of a constant
 mean (or median) log-return over time.
+
+```{r days-per-six-month-period, echo=FALSE, message=FALSE, warning=FALSE}
+kable(
+  days_table,
+  col.names = c(
+    "Start date",
+    "End date",
+    "Number of data points post cleaning"
+  ),
+  caption = "Number of non-missing log-return observations in each six-month period.",
+  booktabs = TRUE,
+  longtable = TRUE,
+  align = c("r","r", "c")
+) |>
+  kable_styling(
+    full_width = FALSE,
+    position = "center"
+  )
+```
+
+```{r element3-boxplot, echo=FALSE, fig.cap = "TBC: boxplots showing log-returns of IXJKFLDS! over six-month periods."}
+ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(
+    title = "Log-returns over six-month periods",
+    x = "Six-month period",
+    y = expression(z[n])
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
 
 ```{=latex}
 \clearpage
@@ -2415,46 +2462,10 @@ In \S\@ref(elementThr) the log-returns data were split into six-month periods,
 as shown in Figure \@ref(fig:element3-boxplot).
 
 ```{r, echo=FALSE, out.width="70%"}
-knitr::include_graphics("fig/element3-boxplot-1.pdf")
+# knitr::include_graphics("fig/element3-boxplot-1.pdf")
 ```
 
-```{r appendix-setup, echo=FALSE, message=FALSE, warning=FALSE}
-#---------- Appendix: check & count observations in 6-month periods -----------#
-# Count observations in each 6-month period
-days_per_period <- sapply(z_list, NROW)
 
-period_labels <- names(days_per_period)
-
-# split into start/end strings
-start_dates <- sub(" -.*", "", period_labels)
-end_dates   <- sub(".*- ", "", period_labels)
-
-days_table <- data.frame(
-  `Start date`             = start_dates,
-  `End date`               = end_dates,
-  `Number of data entries` = as.integer(days_per_period),
-  check.names = FALSE
-)
-```
-
-```{r days-per-six-month-period, echo=FALSE, message=FALSE, warning=FALSE}
-kable(
-  days_table,
-  col.names = c(
-    "Start date",
-    "End date",
-    "Number of data points post cleaning"
-  ),
-  caption = "Number of non-missing log-return observations in each six-month period.",
-  booktabs = TRUE,
-  longtable = TRUE,
-  align = c("r","r", "c")
-) |>
-  kable_styling(
-    full_width = FALSE,
-    position = "center"
-  )
-```
 
 ```{=latex}
 \newpage
