@@ -764,7 +764,7 @@ kable(
   desc_z_n_clean,
   # caption = "Descriptive statistics of cleaned log returns ($z_n$).",
   caption = paste0(
-    "Descriptive statistics of cleaned Nasdaq log returns (n = ", 
+    "Descriptive statistics of cleaned Nasdaq log-returns (n = ", 
     format(length(z_n_clean), big.mark = ","), 
     "). Skewness and kurtosis were calculated using Type 1 estimators. Given the large sample size, differences compared to bias-corrected (Type 2 or 3) estimators are negligible."
   ),
@@ -1309,10 +1309,10 @@ kable(
 ```
 
 
-```{=latex}
-\clearpage
-\newpage
-```
+<!-- ```{=latex} -->
+<!-- \clearpage -->
+<!-- \newpage -->
+<!-- ``` -->
 
 ## Investigation of constant mean {#elementThr}
 
@@ -1439,9 +1439,25 @@ kruskal_df <- data.frame(
 
 kruskal_df$Statistic <- sprintf("%.3f", kruskal_df$Statistic)
 kruskal_df$p.value <- formatC(kruskal_df$p.value, format = "fg", digits = 4)
+# The interpretation of the Kruskal-Wallis test depends on the homogeneity of
+# variance across groups. We test assumption of constant variance in
+# \S\@ref(elementFou) so not safe (I think) to assume it here.
+# We instead rely on the strict assumption that the distributions share 
+# identical shapes. The Kruskal-Wallis test should therefore be interpreted in 
+# its most general form 
+# -> assessing differences in mean ranks (stochastic dominance) rather than a 
+# whether the medians are equal
+# 
+# Stochastic dominance:
+# If Group A stochastically dominates Group B, it implies that if you picked 
+# one random number from A and one random number from B, the number from A 
+# is likely to be larger than B more than 50% of the time.
+# tldr; because some boxplots are fat (high variance) and some are thin, we 
+# can't just talk about the median - instead want to say something like: 
+# "This group generally tends to produce higher numbers than that group"
 ```
 
-```{r kruskal-res, echo=FALSE, message=FALSE, warning=FALSE}
+```{r kruskal-res, echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
 kable(
   kruskal_df,
   caption = "Kruskal–Wallis test outcome for differences in log-return distributions across six-month periods.",
@@ -1452,66 +1468,64 @@ kable(
   kable_styling(full_width = FALSE, position = "center")
 ```
 
+To evaluate the assumption that the log-returns $z_n$ possess a constant mean,
+$\mu$, the log-returns data were partitioned into fourteen 6-month periods. As
+shown in Table \@ref(tab:daysPerSixMonthPeriod), the Jan 2020 - Jul 2020 window
+contains fewer observations (n=`r min(days_per_period)`) following data
+cleaning. However, all subsamples remain sufficiently large
+(n>`r floor(min(days_per_period) / 10) * 10`) 
+to yield reliable statistical estimates.
 
-Want to test second core assumption that the log-returns $z_n$ have a constant
-mean $\mu$\dots
+Given the significant departures from normality established in
+\S\@ref(elementOne) & \@ref(elementTwo), parametric methods, such as Analysis of
+Variance are inappropriate. The Kruskal-Wallis rank sum test was 
+implemented to determine whether the log-returns across the 6-month periods 
+originate from the same distribution [@hollander2013nonparametric]. 
 
-@hollander2013nonparametric
+The interpretation of the Kruskal-Wallis test depends on the homogeneity of
+variance across groups. The assumption of constant variance is tested in
+\S\@ref(elementFou) (and may not hold given the volatility clustering observed
+in Figure \@ref(fig:element3-boxplot)), so one cannot rely on the strict
+assumption that the distributions share identical shapes. The Kruskal-Wallis 
+test is therefore interpreted in its most general form: assessing
+differences in mean ranks (stochastic dominance) rather than a strict equality
+of medians. The hypotheses are defined as:
 
-
-
-Want to use split() function to divide the data by time periods to create a list
-of 14 xts objects, each representing a 6-month period. The number of data points
-per six-month period is shown in Table \@ref(tab:days-per-six-month-period).
-
-The log-returns were split into fourteen  6-month periods (Table
-\@ref(tab:days-per-six-month-period)). Although the Jan 2020–Jun 2020 window
-contains relatively fewer observations, we assume it remains representative of
-the index’s behaviour.
-
-From \S\@ref(elementOne) & \@ref(elementTwo) we know that our data cannot be
-treated as being normally distributed/shows strong departures from Normality. We
-therefore opted to use a non-parametric alternative to one-way ANOVA.
-
-<!-- We therefore cannot use ANOVA testing as it is based upon an assumption of normality. -->
-
-The Kruskal-Wallis test was used as a non-parametric alternative to one-way
-ANOVA to compare the behaviour of $z_n$ across the six-month periods.
-
-The Kruskal–Wallis test compares the distributions (equivalently, the mean
-ranks) of the groups. Under the null hypothesis $H_0$, all groups share the same
-distribution. If we assume similar spread and shape, this can be interpreted as
-equality of medians (ref!).
-
-- Comment on Kruskal-Wallis assumptions (independence element can be referenced)
-
-This checks for differences in central tendency across groups and the null
-hypothesis ($H_0$) is that the medians of all 14 groups are equal.
-
-Kruskal–Wallis: The hypotheses are defined as:
-
-<!-- $$ -->
-<!-- \begin{cases} -->
-<!-- H_0: \text{The distributions of the 14 subsamples are identical} & (F_1 = F_2 = \dots = F_{14}) \\ -->
-<!-- H_1: \text{At least one subsample tends to yield larger values} & (\exists i,j: P(X_i > X_j) > 0.5) -->
-<!-- \end{cases} -->
-<!-- $$ -->
-<!-- OR -->
 $$
 \begin{cases}
 H_0: \text{The distributions of the 14 samples are identical} \\
-H_1: \text{At least one sample comes from a distribution that tends} \\ 
-\qquad\, \text{to produce larger or smaller values than the others}
+H_1: \text{At least one subsample stochastically dominates another} \\ 
+\qquad\, \text{(i.e., tends to produce systematically larger or smaller values)}
 \end{cases}
 $$
 
-As shown in Table \@ref(tab:kruskal-res), there are no statistically significant
-differences in the typical (central) log-return across the periods
-(p=`r signif(kruskal_res$p.value, 3)`). We therefore accept the null hypothesis,
-$H_0$, that (!TBI). This finding is consistent with the assumption of a constant
-mean (or median) log-return over time.
+The Kruskal–Wallis test statistic was 
+$\chi^{2}_{\text{`r signif(kruskal_res$parameter[[1]], 3)`}}$ =
+`r signif(kruskal_res$statistic[[1]], 4)`
+(p `r format_p_vals(kruskal_res$p.value)`). There is insufficient evidence to reject the null hypothesis at the 95%
+confidence level.
 
-```{r days-per-six-month-period, echo=FALSE, message=FALSE, warning=FALSE}
+There are no statistically significant differences in the mean ranks of the
+log-returns across the fourteen 6-month periods. This suggests that while the 
+volatility (variance) may fluctuate over time, the location of the distribution 
+remains stable. The Nasdaq does not exhibit 6-month periods where log-returns are 
+systematically higher or lower on average, supporting the assumption of a 
+constant mean $\mu$. Crucially, the visual evidence of volatility clustering 
+indicates that this stability does not extend to the variance.
+
+```{r element3-boxplot, echo=FALSE, fig.height=3.4, fig.pos='!ht', fig.cap = "Boxplots showing the distribution of Nasdaq log-returns partitioned into fourteen six-month intervals (Jan 2018 – Dec 2024)."}
+ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(
+    title = "Log-returns over six-month periods",
+    x = "Six-month period",
+    y = expression(z[n])
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r daysPerSixMonthPeriod, echo=FALSE, message=FALSE, warning=FALSE}
 kable(
   days_table,
   col.names = c(
@@ -1528,18 +1542,6 @@ kable(
     full_width = FALSE,
     position = "center"
   )
-```
-
-```{r element3-boxplot, echo=FALSE, fig.cap = "TBC: boxplots showing log-returns of IXJKFLDS! over six-month periods."}
-ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
-  geom_boxplot() +
-  theme_bw() +
-  labs(
-    title = "Log-returns over six-month periods",
-    x = "Six-month period",
-    y = expression(z[n])
-  ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ```{=latex}
