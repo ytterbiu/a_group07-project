@@ -32,7 +32,7 @@ bibliography: references.bib
 ---
 
 ```{=latex}
-\newpage 
+\newpage
 ```
 
 ```{=html}
