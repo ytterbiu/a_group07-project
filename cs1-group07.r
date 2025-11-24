@@ -143,6 +143,17 @@ format_p_vals <- function(p) {
     "< 0.001"
   }
 }
+#####################################
+# function: format confidence intervals for tables & text 
+# Usage (in-line): `r format_interval(el2_ci_normal_95[1], el2_ci_normal_95[2])`
+# Usage (console): format_interval(el2_ci_normal_95[1], el2_ci_normal_95[2])
+#####################################
+format_interval <- function(lower, upper, digits=3) {
+  paste0("[", 
+       formatC(lower, format = "f", digits = digits), ", ",
+       formatC(upper, format = "f", digits = digits), 
+       "]")
+}
 
 #---------------------------- Download / Load data ----------------------------#
 # Daily adjusted closing values for ^IXIC over the period 1 January 2018 to 31
@@ -565,24 +576,6 @@ desc_z_n_clean <- tibble(
 ) |>
   mutate(Value = sprintf("%.6f", Value))
 
-kable(
-  desc_z_n_clean,
-  # caption = "Descriptive statistics of cleaned log returns ($z_n$).",
-  caption = paste0(
-    "Descriptive statistics of cleaned Nasdaq log returns (n = ", 
-    format(length(z_n_clean), big.mark = ","), 
-    "). Skewness and kurtosis were calculated using Type 1 estimators. Given the large sample size, differences compared to bias-corrected (Type 2 or 3) estimators are negligible."
-  ),
-  booktabs = TRUE,
-  align = c("l", "r"),
-  escape = FALSE
-) |>
-  kable_styling(
-      full_width = FALSE, 
-      position = "center", 
-      latex_options = "hold_position"
-    )
-
 #- Element 1 - (bonus) Table with type 2 & 3 estimators (not used in report) --#
 # BE note: changed to include = FALSE on 19/11/2025
 z_n_clean_numeric <- as.numeric(z_n_clean)
@@ -622,6 +615,24 @@ kable(
 
 ad_test_result <- ad.test(z_n_clean)
 ad_test_result
+
+kable(
+  desc_z_n_clean,
+  # caption = "Descriptive statistics of cleaned log returns ($z_n$).",
+  caption = paste0(
+    "Descriptive statistics of cleaned Nasdaq log-returns (n = ", 
+    format(length(z_n_clean), big.mark = ","), 
+    "). Skewness and kurtosis were calculated using Type 1 estimators. Given the large sample size, differences compared to bias-corrected (Type 2 or 3) estimators are negligible."
+  ),
+  booktabs = TRUE,
+  align = c("l", "r"),
+  escape = FALSE
+) |>
+  kable_styling(
+      full_width = FALSE, 
+      position = "center", 
+      latex_options = "hold_position"
+    )
 
 knitr::include_graphics("fig/timeline2.pdf")
 
@@ -758,7 +769,7 @@ initial_vis_p3 <- ggplot(df, aes(date, rolling_sd)) +
       "-day rolling window)"
       ),
     x = NULL,
-    y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+    y = bquote( s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   base_theme +
   outlier_shading
@@ -803,11 +814,19 @@ N_reps <- 50000
 n_sample_size <- 13
 
 # Simulate 50,000 skewness values using sample size of 13
+#   Generate 13 values normally distributed with (z_mean, z_sd) 
+#   Calculate skewness of these 13 values
+#   Repeat process 50,000 times
+#   Tells one how much noise one would expect given this small sample size (13)
 skew_normal_sim <- replicate(
   N_reps, e1071::skewness(rnorm(n_sample_size, z_mean, z_sd), type = 1)
   )
 
 # bootstrapping skewness simulation
+#   Pick 13 values from z_n_clean (with replacement)
+#   Calculate skewness of these 13 values
+#   Repeat process 50,000 times
+#   Looking at skewness if we just take 13 random days of data
 skew_bootstrap <- replicate(
   N_reps, e1071::skewness(sample(z_n_clean, n_sample_size, replace = TRUE), type = 1)
   )
@@ -887,25 +906,20 @@ ci_95_skew_normals_quantile <- quantile(skew_normal_sim, probs = c(0.025, 0.975)
 
 
 #------------ BCa interval for skewness using bcanon
-bca_skew <- bcanon(
-  x     = z_n_clean,
-  nboot = N_reps,
-  alpha = c(.025,.975),
-  theta = e1071::skewness,
-  type  = 1
-)
-
+# bca_skew <- bcanon(
+#   x     = z_n_clean,
+#   nboot = N_reps,
+#   alpha = c(.025,.975),
+#   theta = e1071::skewness,
+#   type  = 1
+# )
+# 
 # # calculating quantile based confidence interval
 # print(ci_95_skew_zn_boot_quantile)
 # print(ci_95_skew_normals_quantile)
-
+# 
 # alpha and corresponding BCa points
 # print(bca_skew$confpoints)
-
-skew_boot_full <- replicate(
-  N_reps,
-  e1071::skewness(sample(z_n_clean, length(z_n_clean), replace = TRUE), type = 1)
-)
 
 # quantile(skew_boot_full, c(0.025, 0.975))
 
@@ -917,7 +931,15 @@ el2_ci_normal_95 <- quantile(skew_normal_sim, probs = c(0.025, 0.975))
 # Bootstrap percentile CI from empirical data, n = 13
 el2_ci_boot_95 <- quantile(skew_bootstrap, probs = c(0.025, 0.975))
 
-# (bonus) BCa bootstrap CI for skewness using full data, n = 1651
+# (bonus) bootstrap 9% CI for skewness using full data, n = ~1737
+# using standard percentile
+skew_boot_full <- replicate(
+  N_reps,
+  e1071::skewness(sample(z_n_clean, length(z_n_clean), replace = TRUE), type = 1)
+)
+el2_ci_boot_full_perc <- quantile(skew_boot_full, probs = c(0.025, 0.975))
+
+# using bcanon BCa
 bca_skew <- bcanon(
   x     = z_n_clean,
   nboot = N_reps,
@@ -925,46 +947,63 @@ bca_skew <- bcanon(
   type  = 1,
   alpha = c(0.025, 0.975)
 )
-
-el2_ci_bca_95 <- bca_skew$confpoints[, "bca point"]
+el2_ci_boot_full_bca <- bca_skew$confpoints[, "bca point"]
 
 ci_table <- data.frame(
-  Method = c(
-    "Simulated normal percentile",
-    "Bootstrap percentile",
-    "BCa bootstrap (full data)"
+  Dataset = c(
+    "Small Sample (n=13)",
+    "Small Sample (n=13)",
+    "Full Data (n=1737)",
+    "Full Data (n=1737)"
   ),
-  N = c(
-    n_sample_size,
-    n_sample_size,
-    length(z_n_clean)
+  Method = c(
+    "Simulated Normal (Control)",
+    "Bootstrap Percentile",
+    "Bootstrap Percentile",
+    "BCa Bootstrap (Robust)"
   ),
   Lower = c(
     el2_ci_normal_95[1],
-    el2_ci_boot_95[1],
-    el2_ci_bca_95[1]
+    el2_ci_boot_95[1],        
+    el2_ci_boot_full_perc[1],
+    el2_ci_boot_full_bca[1]
   ),
   Upper = c(
     el2_ci_normal_95[2],
-    el2_ci_boot_95[2],
-    el2_ci_bca_95[2]
+    el2_ci_boot_95[2],        
+    el2_ci_boot_full_perc[2],
+    el2_ci_boot_full_bca[2]
   )
 )
 
-kable(
-  ci_table,
-  caption = "Comparison of 95 percent confidence intervals for skewness under different approaches.",
-  booktabs = TRUE,
-  align = c("l", rep("r", 3)),
-  digits = 3,
-  row.names = FALSE,
-  escape = FALSE
-) |>
-  add_header_above(
-    c(" " = 2, "95 percent CI" = 2),
-    escape = FALSE
-  ) |>
-  kable_styling(full_width = FALSE, position = "center")
+ci_table_2_digits <- 2
+ci_table_2 <- data.frame(
+  Dataset = c(
+    "Small Sample",
+    "Small Sample",
+    "Full Data",
+    "Full Data"
+  ),
+  Method = c(
+    "Simulated Normal",
+    "Bootstrap Percentile",
+    "Bootstrap Percentile",
+    "Bootstrap BCa"
+  ),
+  N = c(
+    n_sample_size,        
+    n_sample_size,        
+    length(z_n_clean),    
+    length(z_n_clean)     
+  ),
+  `95 percent CI` = c(
+    format_interval(el2_ci_normal_95[1], el2_ci_normal_95[2], ci_table_2_digits),
+    format_interval(el2_ci_boot_95[1], el2_ci_boot_95[2], ci_table_2_digits),
+    format_interval(el2_ci_boot_full_perc[1], el2_ci_boot_full_perc[2], ci_table_2_digits),
+    format_interval(el2_ci_boot_full_bca[1], el2_ci_boot_full_bca[2], ci_table_2_digits)
+  ),
+  check.names = FALSE
+)
 
 
 # bootstrapping skewness simulation
@@ -979,12 +1018,42 @@ skew_df <- data.frame(
 ggplot(skew_df, aes(x = skewness, fill = Source)) +
   geom_density(alpha = 0.4) +
   theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
   labs(
     title = expression("Sampling distributions of " * hat(gamma)[1] *
                        " for n = 13"),
     x     = expression(hat(gamma)[1]),
     y     = "Density"
   )
+
+# kable(
+#   ci_table,
+#   caption = "Comparison of 95% Confidence Intervals for skewness across sample sizes and methods. The ",
+#   booktabs = TRUE,
+#   align = c("l", rep("r", 3)),
+#   digits = 3,
+#   row.names = FALSE,
+#   escape = FALSE
+# ) |>
+#   add_header_above(
+#     c(" " = 2, "95 percent CI" = 2),
+#     escape = FALSE
+#   ) |>
+#   kable_styling(full_width = FALSE, position = "center")
+
+kable(
+  ci_table_2,
+  caption = "Comparison of 95 percent confidence intervals for skewness across sample sizes and methods. The simulated normal sample is a baseline control derived from a theoretical normal distribution with a small sampling size, the bootstrap percentile intervals are calculated directly from the empirical 2.5th and 97.5th quantiles, while the Bootstrap BCa interval employs bias correction and acceleration to adjust for the inherent asymmetry of the estimator, offering the most robust metric for the full dataset.",
+  booktabs = TRUE,
+  align = c("l", "l", "r", "l"),
+  digits = 3,
+  row.names = FALSE,
+) %>%
+  kable_styling(
+    full_width = FALSE, 
+    position = "center",
+    latex_options = "hold_position"
+    )
 
 # ==============================================================================
 #----------------- Element 3: investigation of constant mean ------------------#
@@ -1058,15 +1127,22 @@ combined_df_el3 <- bind_rows(lapply(seq_along(z_list), function(i) {
   )
 }))
 
-ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
-  geom_boxplot() +
-  theme_bw() +
-  labs(
-    title = "Log-returns over six-month periods",
-    x = "Six-month period",
-    y = expression(z[n])
-  ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#---------- Element 4: check & count observations in 6-month periods ----------#
+# Count observations in each 6-month period
+days_per_period <- sapply(z_list, NROW)
+
+period_labels <- names(days_per_period)
+
+# split into start/end strings
+start_dates <- sub(" -.*", "", period_labels)
+end_dates   <- sub(".*- ", "", period_labels)
+
+days_table <- data.frame(
+  `Start date`             = start_dates,
+  `End date`               = end_dates,
+  `Number of data entries` = as.integer(days_per_period),
+  check.names = FALSE
+)
 
 kruskal_res <- kruskal.test(z_value ~ Period, data = combined_df_el3)
 
@@ -1079,15 +1155,63 @@ kruskal_df <- data.frame(
 
 kruskal_df$Statistic <- sprintf("%.3f", kruskal_df$Statistic)
 kruskal_df$p.value <- formatC(kruskal_df$p.value, format = "fg", digits = 4)
+# The interpretation of the Kruskal-Wallis test depends on the homogeneity of
+# variance across groups. We test assumption of constant variance in
+# \S\@ref(elementFou) so not safe (I think) to assume it here.
+# We instead rely on the strict assumption that the distributions share 
+# identical shapes. The Kruskal-Wallis test should therefore be interpreted in 
+# its most general form 
+# -> assessing differences in mean ranks (stochastic dominance) rather than a 
+# whether the medians are equal
+# 
+# Stochastic dominance:
+# If Group A stochastically dominates Group B, it implies that if you picked 
+# one random number from A and one random number from B, the number from A 
+# is likely to be larger than B more than 50% of the time.
+# tldr; because some boxplots are fat (high variance) and some are thin, we 
+# can't just talk about the median - instead want to say something like: 
+# "This group generally tends to produce higher numbers than that group"
+
+# kable(
+#   kruskal_df,
+#   caption = "Kruskal–Wallis test outcome for differences in log-return distributions across six-month periods.",
+#   booktabs = TRUE,
+#   align = c("l", "r", "r", "r"),
+#   row.names = FALSE
+# ) |>
+#   kable_styling(full_width = FALSE, position = "center")
+
+ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
+  geom_boxplot() +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(
+    title = "Log-returns over six-month periods",
+    x = "Six-month period",
+    y = expression(z[n])
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 kable(
-  kruskal_df,
-  caption = "Kruskal–Wallis test outcome for differences in log-return distributions across six-month periods.",
+  days_table,
+  col.names = c(
+    "Start date",
+    "End date",
+    "Number of data points post cleaning"
+  ),
+  caption = "Number of log-return data points in each six-month period.",
   booktabs = TRUE,
-  align = c("l", "r", "r", "r"),
-  row.names = FALSE
+  longtable = TRUE,
+  linesep = c("", "\\addlinespace"),
+  align = c("r","r", "c")
 ) |>
-  kable_styling(full_width = FALSE, position = "center")
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("repeat_header"),
+    repeat_header_text = "\textit{(continued)}",
+    repeat_header_method = "append",
+  )
 
 # ==============================================================================
 #--------------- Element 4: investigation of constant variance ----------------#
@@ -1101,6 +1225,10 @@ max_var_loc <- which.max(variances)
 var_df <- data.frame(
   Period   = factor(names(z_list), levels = names(z_list)),
   Variance = as.numeric(variances)
+)
+var_df_annual <- data.frame(
+  Period   = factor(names(z_list), levels = names(z_list)),
+  Variance = as.numeric(variances)*252
 )
 
 # !changed to *252: extract the subsamples as numeric vectors & drop NA
@@ -1170,149 +1298,6 @@ min_period_label <- period_labels[min_var_loc]
 max_period_label <- period_labels[max_var_loc]
 
 
-# replotting box plot from investigation of constant mean above new variance bar
-# chart
-
-# boxplot
-p_box_el4 <- ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
-  geom_boxplot(width = 0.75, outlier.size = 0.7, linewidth   = 0.3) +
-  theme_bw() +
-  labs(
-    title = "Log-returns over six-month periods",
-    x = "Six-month period",
-    y = expression(z[n])
-  ) +
-  theme(
-    # panel.grid = element_blank(),
-    # panel.grid.major.y = element_blank(),
-    # panel.grid.minor.y = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.x     = element_blank(),
-    axis.ticks.x    = element_blank(),
-  )
-
-p_var_el4 <- ggplot(var_df, aes(x = Period, y = Variance, fill = Period)) +
-  # scale_fill_viridis_d() +
-  geom_col(fill = "white", colour = "black", width = 0.75, linewidth   = 0.3) +
-  theme_bw() +
-  labs(
-    title = "Sample variance of log-returns by six-month period",
-    x = "Six-month period",
-    y = expression(s^2)
-  ) +
-  # scale_y_continuous(limits = c(0, 5e-04), expand = c(0,0)) +
-  theme(
-    # panel.grid = element_blank(),
-    # panel.grid.major.y = element_blank(),
-    # panel.grid.minor.y = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.x     = element_text(angle = 45, hjust = 1),
-    legend.position = "none",
-  )
-
-# Stack vertically with aligned x-axis
-(p_box_el4 / p_var_el4) +
-  plot_layout(heights = c(1, 1))
-
-
-p_violin <- ggplot(combined_df_el3, aes(x = Period, y = z_value, fill = Period)) +
-  geom_violin(trim = TRUE, colour = "grey20", alpha = 0.4) +
-  geom_boxplot(
-    width = 0.2,
-    outlier.size = 0.5,
-    fill = "white",
-    colour = "black"
-  ) +
-  scale_fill_viridis_d() +
-  theme_bw() +
-  labs(
-    title = "Distribution of log-returns across six-month periods",
-    x = NULL,
-    y = expression(z[n])
-  ) +
-  theme(
-    # panel.grid = element_blank(),
-    # panel.grid.major.y = element_blank(),
-    # panel.grid.minor.y = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.x     = element_blank(),
-    axis.ticks.x    = element_blank(),
-    legend.position = "none"
-  )
-
-p_var <- ggplot(var_df, aes(x = Period, y = Variance, fill = Period)) +
-  geom_col(alpha = 0.95) +
-  scale_fill_viridis_d() +
-  theme_bw() +
-  labs(
-    title = "Sample variance of log-returns by six-month period",
-    x = "Six-month period",
-    y = expression(s^2)
-  ) +
-  theme(
-    # panel.grid = element_blank(),
-    # panel.grid.major.y = element_blank(),
-    # panel.grid.minor.y = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.x     = element_text(angle = 45, hjust = 1),
-    legend.position = "none"
-  )
-
-# Stack vertically with aligned x-axis
-(p_violin / p_var) +
-  plot_layout(heights = c(1, 1))
-
-# Create summary table
-var_ci_table <- data.frame(
-  Subsample = c("Min variance", "Max variance"),
-  Period = c(min_period_label, max_period_label),
-  s2        = c(var(min_var_sample),
-                var(max_var_sample)),
-  CI_lower  = c(var_ci_min_bca[1],
-                var_ci_max_bca[1]),
-  CI_upper  = c(var_ci_min_bca[2],
-                var_ci_max_bca[2])
-)
-
-fmt <- function(x) formatC(x, format = "f", digits = 6)
-
-var_ci_table_disp <- var_ci_table %>%
-  mutate(
-    s2       = paste0("$", fmt(s2), "$"),
-    CI_lower = paste0("$", fmt(CI_lower), "$"),
-    CI_upper = paste0("$", fmt(CI_upper), "$")
-  )
-
-kable(
-  var_ci_table,
-  col.names = c(
-    "Subsample",
-    "Six-month period",
-    "Sample variance",
-    "95\\% CI lower",
-    "95\\% CI upper"
-  ),
-  booktabs = TRUE,
-  align = c("l", "l", "r", "r", "r"),
-  escape = FALSE,
-  digits = 6,
-  caption = "Bootstrap bias-corrected and accelerated 95\\% confidence intervals for the sample variance $s^2$ in the six-month periods with minimum and maximum sample variance."
-) %>%
-  kable_styling(full_width = FALSE, position = "center")
-
-# kable(
-#   var_ci_table,
-#   caption = "Bootstrap BCa 95\\% confidence intervals for the variance $s^2$ in the six-month periods with the smallest and largest sample variance of log-returns.",
-#   booktabs = TRUE,
-#   align = c("l", "r", "r", "r"),
-#   escape = FALSE
-# ) |>
-#   kable_styling(full_width = FALSE, position = "center")
-
 # Daily variance per period, then annualise
 variances_daily <- sapply(z_list, var, na.rm = TRUE)
 variances_ann   <- variances_daily * 252
@@ -1352,6 +1337,54 @@ s2_max_ann <- var(max_var_sample) * 252
 min_period_label <- period_labels[min_var_loc]
 max_period_label <- period_labels[max_var_loc]
 
+# Bootstrapping confidence intervals for $\sigma^2$ 
+# Create summary table
+var_ci_table <- data.frame(
+  Subsample = c("Min variance", "Max variance"),
+  Period = c(min_period_label, max_period_label),
+  s2        = c(var(min_var_sample),
+                var(max_var_sample)),
+  CI_lower  = c(var_ci_min_bca[1],
+                var_ci_max_bca[1]),
+  CI_upper  = c(var_ci_min_bca[2],
+                var_ci_max_bca[2])
+)
+
+fmt <- function(x) formatC(x, format = "f", digits = 6)
+
+var_ci_table_disp <- var_ci_table %>%
+  mutate(
+    s2       = paste0("$", fmt(s2), "$"),
+    CI_lower = paste0("$", fmt(CI_lower), "$"),
+    CI_upper = paste0("$", fmt(CI_upper), "$")
+  )
+
+# kable(
+#   var_ci_table,
+#   col.names = c(
+#     "Subsample",
+#     "Six-month period",
+#     "Sample variance",
+#     "95\\% CI lower",
+#     "95\\% CI upper"
+#   ),
+#   booktabs = TRUE,
+#   align = c("l", "l", "r", "r", "r"),
+#   escape = FALSE,
+#   digits = 6,
+#   caption = "Bootstrap bias-corrected and accelerated 95\\% confidence intervals for the sample variance $s^2$ in the six-month periods with minimum and maximum sample variance."
+# ) %>%
+#   kable_styling(full_width = FALSE, position = "center")
+
+# kable(
+#   var_ci_table,
+#   caption = "Bootstrap BCa 95\\% confidence intervals for the variance $s^2$ in the six-month periods with the smallest and largest sample variance of log-returns.",
+#   booktabs = TRUE,
+#   align = c("l", "r", "r", "r"),
+#   escape = FALSE
+# ) |>
+#   kable_styling(full_width = FALSE, position = "center")
+
 var_ci_table <- data.frame(
   Subsample = c("Min variance", "Max variance"),
   Period    = c(min_period_label, max_period_label),
@@ -1369,18 +1402,96 @@ var_ci_table_disp <- var_ci_table |>
     CI_upper = paste0("$", fmt(CI_upper), "$")
   )
 
+# kable(
+#   var_ci_table,
+#   col.names = c("Subsample", "Six-month period",
+#                 "Annualised variance $s^2$ (×252)",
+#                 "95\\% CI lower", "95\\% CI upper"),
+#   booktabs = TRUE, 
+#   align = c("l","l","r","r","r"),
+#   escape = FALSE, 
+#   digits = 3,
+#   caption = "BCa 95\\% confidence intervals for annualised variance in the six-month periods with minimum and maximum variance."
+# ) |>
+#   kable_styling(full_width = FALSE, position = "center")
+
+# replotting box plot from investigation of constant mean above new variance bar
+# chart
+
+# boxplot
+p_box_el4 <- ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
+  geom_boxplot(width = 0.75, outlier.size = 0.7, linewidth   = 0.3) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(
+    title = "Daily Nasdaq log-returns per six-month period from 2018-2024",
+    x = NULL,
+    y = expression(z[n])
+  ) +
+  theme(
+    # panel.grid = element_blank(),
+    # panel.grid.major.y = element_blank(),
+    # panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.text.x     = element_blank(),
+    axis.ticks.x    = element_blank(),
+  )
+
+p_var_el4 <- ggplot(var_df_annual, aes(x = Period, y = Variance, fill = Period)) +
+  # scale_fill_viridis_d() +
+  geom_col(fill = "white", colour = "black", width = 0.75, linewidth   = 0.3) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(
+    title = "Annualised Nasdaq log-return variance per six-month period from 2018-2024",
+    x = "Six-month period",
+    y = expression(Annualised ~ s[n]^2)
+  ) +
+  # scale_y_continuous(limits = c(0, 5e-04), expand = c(0,0)) +
+  theme(
+    # panel.grid = element_blank(),
+    # panel.grid.major.y = element_blank(),
+    # panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.text.x     = element_text(angle = 45, hjust = 1),
+    legend.position = "none",
+  )
+
+# Stack vertically with aligned x-axis
+(p_box_el4 / p_var_el4) +
+  plot_layout(heights = c(2, 3))
+
+final_table_df <- data.frame(
+  Subsample = c("Min variance", "Max variance"),
+  Period    = c(min_period_label, max_period_label),
+  s2_ann    = c(s2_min_ann, s2_max_ann),
+  ci        = c(
+                format_interval(ci_min_95[1], ci_min_95[2], 3), 
+                format_interval(ci_max_95[1], ci_max_95[2], 3)
+                )
+)
+
 kable(
-  var_ci_table,
-  col.names = c("Subsample", "Six-month period",
-                "Annualised variance $s^2$ (×252)",
-                "95\\% CI lower", "95\\% CI upper"),
-  booktabs = TRUE, 
-  align = c("l","l","r","r","r"),
-  escape = FALSE, 
+  final_table_df,
+  col.names = c(
+    "Subsample", 
+    "Six-month period",
+    "Point Estimate",
+    "95% CI"
+  ),
+  booktabs = TRUE,
   digits = 3,
-  caption = "BCa 95\\% confidence intervals for annualised variance in the six-month periods with minimum and maximum variance."
-) |>
-  kable_styling(full_width = FALSE, position = "center")
+  align = c("l", "l", "r", "c"),
+  caption = "Comparison of annualised variance for the lowest and highest volatility periods. Ninety-five percent CIs were calculated using BCa bootstrapping (N=5,000)."
+) %>%
+  add_header_above(c(" " = 2, "Annualised Variance" = 2)) %>% 
+  kable_styling(
+      full_width = FALSE, 
+      position = "center",
+      latex_options = "hold_position"
+    )
 
 # ==============================================================================
 #------------------- Element 5: independence of increments --------------------#
@@ -1420,6 +1531,56 @@ if (any(chisq_result$expected < 5)) {
   fisher_result
 }
 
+# Create dataframe for the definitions
+quartile_def <- data.frame(
+  Category = c("Q1", "Q2", "Q3", "Q4"),
+  Range    = c("$z_n \\le Q_1$", 
+               "$Q_1 < z_n \\le Q_2$", 
+               "$Q_2 < z_n \\le Q_3$", 
+               "$z_n > Q_3$")
+)
+
+kable(
+  quartile_def,
+  col.names = c("Category", "Mathematical Range"),
+  align = c("c", "c", "l"),
+  escape = FALSE, 
+  booktabs = TRUE,
+  caption = "Classification of log-returns into discrete categories based on sample quartiles."
+) %>%
+  kable_styling(
+    full_width = FALSE, 
+    position = "center",
+    latex_options = "hold_position"
+    )
+
+# # get expected counts
+# expected_matrix <- chisq_result$expected
+# 
+# expected_df <- as.data.frame.matrix(expected_matrix)
+# expected_df <- tibble::tibble(
+#   `$z_{n-1}$ quartile` = rownames(expected_matrix),
+#   expected_df
+# )
+# 
+# kable(
+#   expected_df,
+#   caption = "Expected cell frequencies under the null hypothesis of serial independence.",
+#   booktabs = TRUE,
+#   digits = 1,
+#   align = c("l", rep("r", 4)),
+#   escape = FALSE
+# ) |>
+#   add_header_above(
+#     c(" " = 1, "$z_n$ quartile" = 4),
+#     escape = FALSE
+#   ) |>
+#   kable_styling(
+#     full_width = FALSE,
+#     position = "center",
+#     latex_options = "hold_position"
+#     )
+
 con_table_df <- as.data.frame.matrix(con_table)
 
 con_table_df <- tibble::tibble(
@@ -1438,7 +1599,11 @@ kable(
     c(" " = 1, "$z_n$ quartile" = 4),
     escape = FALSE
   ) |>
-  kable_styling(full_width = FALSE, position = "center")
+  kable_styling(
+    full_width = FALSE, 
+    position = "center",
+    latex_options = "hold_position"
+    )
 
 # ==============================================================================
 #------------------- Element 6: general upwardness of trend -------------------#
@@ -1446,9 +1611,17 @@ kable(
 
 num_positive <- sum(z_n_clean > 0)
 total_days <- length(z_n_clean)
+
 # test using binomial (could also approximate, but Russell normally says
 # 'why approximate when you can calculate' so opted for that here)
 binom_res <- binom.test(num_positive, total_days, p = 0.5, alternative = "greater")
+
+# BE note: In element 5 we showed that returns are dependent but using a 
+# Binomial we assume they are independent. 
+# The below is using the normal approximation
+# prop.test(num_positive, total_days, p = 0.5, correct = FALSE)
+# This returns a p-value of ~2.28*10^-6
+
 
 #------------------- Element 6: persistence of trends
 # use run length encoding
@@ -1530,7 +1703,7 @@ appendix_p1 <- ggplot(nasdaq_data_full, aes(x = date)) +
       "-day rolling window)"
       ),
     x = "Date",
-    y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+    y = bquote( s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   # not visible when included so commented out
   # outlier_shading +
@@ -1561,7 +1734,7 @@ appendix_p2 <- ggplot(
       "-day rolling window)"
       ),
     x = "Date",
-    y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+    y = bquote( s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   ylim(0.01, 0.99) +
   # theme(legend.position = "none") +
@@ -1574,40 +1747,4 @@ appendix_p2 <- ggplot(
     legend.position = "none"
   )
 
-knitr::include_graphics("fig/appendix-COVID19-selection.pdf")
-
-knitr::include_graphics("fig/element3-boxplot-1.pdf")
-
-#---------- Appendix: check & count observations in 6-month periods -----------#
-# Count observations in each 6-month period
-days_per_period <- sapply(z_list, NROW)
-
-period_labels <- names(days_per_period)
-
-# split into start/end strings
-start_dates <- sub(" -.*", "", period_labels)
-end_dates   <- sub(".*- ", "", period_labels)
-
-days_table <- data.frame(
-  `Start date`             = start_dates,
-  `End date`               = end_dates,
-  `Number of data entries` = as.integer(days_per_period),
-  check.names = FALSE
-)
-
-kable(
-  days_table,
-  col.names = c(
-    "Start date",
-    "End date",
-    "Number of data points post cleaning"
-  ),
-  caption = "Number of non-missing log-return observations in each six-month period.",
-  booktabs = TRUE,
-  longtable = TRUE,
-  align = c("r","r", "c")
-) |>
-  kable_styling(
-    full_width = FALSE,
-    position = "center"
-  )
+knitr::include_graphics("fig/appendix-COVID19-selection-3.pdf")

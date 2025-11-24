@@ -37,18 +37,6 @@ bibliography: references.bib
 
 # Introduction
 
-## Executive summary
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. In ullamcorper dapibus
-ante, dignissim pharetra justo consequat nec. Curabitur tempus nulla in augue
-auctor, imperdiet eleifend enim elementum. Nulla facilisi. Integer sed metus non
-justo semper posuere eu sit amet odio. Nullam sodales auctor justo, convallis
-tempor lectus feugiat ut. Quisque et ligula et tellus placerat consequat eu vel
-magna. Vivamus et arcu nulla. Quisque ullamcorper eu odio nec facilisis. Proin
-ac commodo nibh. In hac habitasse platea dictumst. Sed tincidunt porttitor
-maximus. Nunc ullamcorper aliquet consequat. Vestibulum porta, justo auctor
-imperdiet porta, nulla mi gravida tortor, et mattis tortor diam.
-
 ```{=html}
 <!-- ## Key Information
 
@@ -349,7 +337,7 @@ z_n <- na.omit(z_n)
 
 ```
 
-## Background
+<!-- ## Background -->
 
 <!-- https://obl20.com/wp-content/uploads/2020/03/topic1a.pdf -->
 
@@ -377,9 +365,9 @@ $\sigma^{2}$, and are independent over time. This report uses the Nasdaq as a
 case study to assess how well these four assumptions (normality, constant mean,
 constant variance, and independence) hold in practice.
 
-```{=latex}
-\newpage
-```
+<!-- ```{=latex} -->
+<!-- \newpage -->
+<!-- ``` -->
 
 # Individual elements
 
@@ -1891,10 +1879,10 @@ kable(
     )
 ```
 
-```{=latex}
-\clearpage
-\newpage
-```
+<!-- ```{=latex} -->
+<!-- \clearpage -->
+<!-- \newpage -->
+<!-- ``` -->
 
 ## Independence of increments {#elementFiv}
 
@@ -2066,10 +2054,10 @@ kable(
     )
 ```
 
-```{=latex}
-\clearpage
-\newpage
-```
+<!-- ```{=latex} -->
+<!-- \clearpage -->
+<!-- \newpage -->
+<!-- ``` -->
 
 ## General upwardness of trend {#elementSix}
 
@@ -2129,53 +2117,32 @@ mean_neg_run <- mean(neg_run_lengths)
 wilcox_res <- wilcox.test(pos_run_lengths, neg_run_lengths, alternative = "greater")
 ```
 
-To assess the general tendency of the Nasdaq index, the proportion of days with 
-a positive return were analysed. The observed proportion was 
-`r formatC(num_positive / total_days, format = "fg", digits = 3)` (or 
-`r formatC(num_positive*100 / total_days, format = "fg", digits = 3)`%), 
-suggesting a slight upward bias.
+The observed proportion of positive return days was
+`r formatC(num_positive / total_days, format = "fg", digits = 3)` suggesting 
+an upward bias.
 
-To formally assess this directional bias, an Exact Binomial Test (equivalently,
-the Sign Test) was used to determine whether the median
-log-return is significantly greater than zero by treating each day as a
-Bernoulli trial, avoiding the normality assumptions required by a
-$t$-test. While the serial dependence established in \S\@ref(elementFiv) implies
-that the assumption of independent trials is an approximation, the test remains
-a valid descriptive metric for the Nasdaq's general drift. The hypotheses are
-defined as:
-
+To formally test if the median log-return exceeds zero, an Exact Binomial Test
+(Sign Test) was employed. This avoids normality assumptions by treating days as
+Bernoulli trials. Although \S\@ref(elementFiv) established serial dependence,
+the test remains a valid descriptive metric for directional drift. The
+hypotheses are defined as:
 $$
 \begin{cases}
 H_0: p \le 0.5 \qquad (\text{Median log-return } \le 0) \\
 H_1: p > 0.5 \qquad (\text{Median log-return is } > 0)
 \end{cases}
 $$
-<!-- An Exact Binomial test was used to formally test whether this exceeds random  -->
-<!-- chance (p=0.5). While the previous finding of serial dependence  -->
-<!-- (\S\@ref(elementFiv)) implies the assumption of independent Bernoulli trials is  -->
-<!-- an approximation, the test remains a valid descriptive metric for the index's  -->
-<!-- directional drift. The hypotheses are defined as: -->
-<!-- $$ -->
-<!-- \begin{cases} -->
-<!-- H_0: \text{Probability of a positive return is } \le 0.5 & (p \le 0.5) \\ -->
-<!-- H_1: \text{Probability of a positive return is } > 0.5 & (p > 0.5) -->
-<!-- \end{cases} -->
-<!-- $$ -->
 The test returned p `r format_p_vals(binom_res$p.value)`. We therefore reject
 the null hypothesis - the Nasdaq exhibits a statistically significant upward 
-bias (towards positive returns) over 2018-2024. 
+bias. 
 
-The persistence of trends was investigated by comparing sequences of
-consecutive days with the same sign ('runs'). The mean length of positive runs
-is
-`r formatC(mean_pos_run, format = "fg", digits = 3)` days, compared with
+Trend persistence was investigated by comparing "runs" of consecutive signs. 
+Positive runs averaged
+`r formatC(mean_pos_run, format = "fg", digits = 3)` days versus
 `r formatC(mean_neg_run, format = "fg", digits = 3)` days for negative runs.
-
-Given that run lengths are discrete, non-negative, and likely skewed, the
-non-parametric Mann-Whitney U (Wilcoxon Rank-Sum) test was used rather than a
-t-test. The Mann-Whitney U test assumes independent samples and assesses whether
-the distribution of positive run lengths stochastically dominates negative run
-lengths. The hypotheses are defined as:
+Given the discrete, skewed nature of run lengths, the non-parametric
+Mann-Whitney U test was used to assess if positive runs stochastically dominate
+negative ones. The hypotheses are defined as:
 $$
 \begin{cases}
 H_0: \text{Run lengths have identical distributions}  \\
@@ -2184,8 +2151,8 @@ H_1: \text{Positive runs tend to be longer}
 $$
 The Mann-Whitney U test returned p `r format_p_vals(wilcox_res$p.value)`,
 providing sufficient evidence to reject the null hypothesis. This confirms that
-upward ("bullish") trends both occur more frequently and persist for more
-sequential days than downward ("bearish") corrections.
+upward ("bullish") trends occur more frequently and persist longer than 
+downward ("bearish") movements.
 
 
 ```{=latex}
@@ -2471,9 +2438,11 @@ a comprehensive timeline of all contributions by group members.
 
 ## Generative AI Declaration
 
-Generative AI (GenAI) tools were used to assist with project planning,
-methodological validation, and R debugging throughout this project. The GenAI
-tools served as an additional group member in this capacity.
+Generative AI (GenAI) tools were used throughout this project to assist with
+project planning, methodological validation, and debugging. In practice, these
+tools functioned as an additional technical team member, providing immediate
+feedback, troubleshooting code, and challenging statistical assumptions.
+
 
 ### Tools Used
 
@@ -2498,69 +2467,71 @@ similar to 'querying' with a traditional search engine).
   identify the key points"
 - "How can this error be tracked down in an rmd file? ! Text line contains an
   invalid character. l.1 ^^@^^@..."
-- ...
+- "Are there specific assumptions for the Kruskal-Wallis test regarding 
+  variance and where is this explanation in Nonparametric Statistical Methods?"
 
 ### Use of GenAI outputs & subsequent revisions
 
-The GenAI tools served as a additional group member. Notably, the GenAI output:
+The GenAI tools served as a "consultant" member of the group. Notably, the AI 
+output:
 
 - Helped debug plotting issues.
-- Raised potential statistical traps (e.g., the "ANOVA trap" and the "data
-  cleansing order" trap).
-- Suggested appropriate non-parametric tests (Kruskal-Wallis, Wilcoxon Rank-Sum)
-  where the assumptions of parametric tests (ANOVA, t-test) were violated.
+- Highlighted potential statistical pitfalls, such as the "ANOVA trap" 
+  (normality violations) and the importance of ordering data cleansing steps 
+  correctly.
+- Suggested appropriate non-parametric alternatives (Kruskal-Wallis, 
+  Mann-Whitney U) when diagnostic plots revealed that parametric assumptions 
+  were violated.
 - Recommended specific R packages (nortest, e1071) and functions (ad.test,
   kruskal.test) best suited for each task.
 - Commented on the structure of R code snippets and the report structure.
 
 ### Changes made:
 
-The AI's suggestions were critically reviewed and debated by the group. Plotting
-formatting in ggplot, ... (add others) and... were all implemented following an
-iterative feedback cycle.
+All AI suggestions were critically reviewed and debated by the group before 
+implementation. For example:
+- While the AI suggested code for complex layouts, the specific aesthetic choices and annotations were manually adjusted to ensure clarity.
+- Where the AI proposed specific interpretations, these were cross-referenced with academic literature and statistics textbooks.
+- The final R code for implementation was written and debugged by the group with AI snippets being treated as drafts rather than final solutions.
 
-The R code for implementation was written and debugged by the group. GenAI tools
-were used, and thought of, in the capacity of an additional group member. All
-final analysis, interpretation, and writing in this report were generated by
-(human) group members.
+While GenAI was treated as a collaborator, the final analysis, statistical
+interpretation, and the written content of this report were generated and
+verified by the (human) group members.
 
 ## Word count
 
-The R Markdown file was used to produce a `tex` file. The tool `texcount` was 
-then used to count the words within each section. The output of `texcount` is 
-below:
+The group R Markdown file was used to produce a `tex` file and the tool 
+`texcount` was used to count the words within each section. 
+The output of `texcount` is shown below:
 
 ```bash
 $ texcount cs1-group07.tex      
 
 File: cs1-group07.tex
 Encoding: utf8
-Words in text: 2801
-Words in headers: 139
-Words outside text (captions, etc.): 419
-Number of headers: 37
-Number of floats/tables/figures: 14
-Number of math inlines: 53
+Words in headers: 84
+Words outside text (captions, etc.): 524
+Number of headers: 24
+Number of floats/tables/figures: 12
+Number of math inlines: 28
 Number of math displayed: 10
 Subcounts:
   text+headers+captions (#headers/#floats/#inlines/#displayed)
   4+8+0 (1/0/0/0) _top_
-  0+1+0 (1/0/0/0) Section: Introduction}
-  4+2+0 (1/0/0/0) Subsection: Executive summary}
-  137+1+49 (1/0/4/1) Subsection: Background}
+  137+1+49 (1/0/4/1) Section: Introduction}
   0+2+0 (1/0/0/0) Section: Individual elements}
-  174+7+152 (1/3/3/1) Subsection: Data cleaning and standard test of normality}
-  316+31+38 (3/2/5/0) Subsection: Investigation of normality by resampling}
-  228+10+21 (3/2/6/2) Subsection: Investigation of constant mean}
-  200+6+89 (2/4/7/3) Subsection: Investigation of constant variance}
-  157+5+13 (2/1/14/1) Subsection: Independence of increments}
-  323+11+0 (3/0/8/2) Subsection: General upwardness of trend}
-  244+1+0 (1/0/5/0) Section: Conclusions}
+  179+7+163 (1/3/3/1) Subsection: Data cleaning and standard test of normality}
+  204+5+101 (1/2/2/0) Subsection: Investigation of normality by resampling}
+  134+4+26 (1/1/3/1) Subsection: Investigation of constant mean}
+  164+4+47 (1/2/4/1) Subsection: Investigation of constant variance}
+  120+3+23 (1/2/5/1) Subsection: Independence of increments}
+  159+4+0 (1/0/0/2) Subsection: General upwardness of trend}
+  152+1+0 (1/0/1/0) Section: Conclusions}
 ...
 ```
 
-These correspond to a total word count of !x for the executive summary, 
-introduction, elements 1-6, and the conclusion.
+The total word count for the introduction, elements 1-6, and the conclusion is
+1249.
 
 ---
 
