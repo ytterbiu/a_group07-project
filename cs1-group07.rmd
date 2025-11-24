@@ -944,7 +944,7 @@ initial_vis_p3 <- ggplot(df, aes(date, rolling_sd)) +
       "-day rolling window)"
       ),
     x = NULL,
-    y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+    y = bquote( s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   base_theme +
   outlier_shading
@@ -1260,6 +1260,7 @@ skew_df <- data.frame(
 ggplot(skew_df, aes(x = skewness, fill = Source)) +
   geom_density(alpha = 0.4) +
   theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
   labs(
     title = expression("Sampling distributions of " * hat(gamma)[1] *
                        " for n = 13"),
@@ -1510,6 +1511,7 @@ periods. This supports the assumption of a constant mean $\mu$.
 ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
   geom_boxplot() +
   theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
   labs(
     title = "Log-returns over six-month periods",
     x = "Six-month period",
@@ -1527,9 +1529,10 @@ kable(
     "End date",
     "Number of data points post cleaning"
   ),
-  caption = "Number of non-missing log-return observations in each six-month period.",
+  caption = "Number of log-return data points in each six-month period.",
   booktabs = TRUE,
   longtable = TRUE,
+  linesep = c("", "\\addlinespace"),
   align = c("r","r", "c")
 ) |>
   kable_styling(
@@ -1566,6 +1569,10 @@ var_df <- data.frame(
   Period   = factor(names(z_list), levels = names(z_list)),
   Variance = as.numeric(variances)
 )
+var_df_annual <- data.frame(
+  Period   = factor(names(z_list), levels = names(z_list)),
+  Variance = as.numeric(variances)*252
+)
 
 # !changed to *252: extract the subsamples as numeric vectors & drop NA
 min_var_sample <- na.omit(as.numeric(z_list[[min_var_loc]]))*252
@@ -1600,7 +1607,7 @@ var_ci_min_99 <- boot.ci(boot_var_min, type = "bca", conf = 0.99)
 var_ci_max_99 <- boot.ci(boot_var_max, type = "bca", conf = 0.99)
 ```
 
-```{r Element 4 pt2 - table, echo=FALSE}
+```{r Element 4 pt2 - table data, echo=FALSE}
 # Period labels for min/max variance subsamples
 min_period <- names(z_list)[min_var_loc]
 max_period <- names(z_list)[max_var_loc]
@@ -1635,157 +1642,6 @@ var_df <- data.frame(
 min_period_label <- period_labels[min_var_loc]
 max_period_label <- period_labels[max_var_loc]
 
-```
-
-```{r element4-box-bar, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Distributions and variability of cleaned log-returns across six-month periods. Top: violin and boxplot summaries of $z_n$ for each period. Bottom: corresponding sample variances $s^2$, highlighting relative differences in spread."}
-# replotting box plot from investigation of constant mean above new variance bar
-# chart
-
-# boxplot
-p_box_el4 <- ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
-  geom_boxplot(width = 0.75, outlier.size = 0.7, linewidth   = 0.3) +
-  theme_bw() +
-  labs(
-    title = "Log-returns over six-month periods",
-    x = "Six-month period",
-    y = expression(z[n])
-  ) +
-  theme(
-    # panel.grid = element_blank(),
-    # panel.grid.major.y = element_blank(),
-    # panel.grid.minor.y = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.x     = element_blank(),
-    axis.ticks.x    = element_blank(),
-  )
-
-p_var_el4 <- ggplot(var_df, aes(x = Period, y = Variance, fill = Period)) +
-  # scale_fill_viridis_d() +
-  geom_col(fill = "white", colour = "black", width = 0.75, linewidth   = 0.3) +
-  theme_bw() +
-  labs(
-    title = "Sample variance of log-returns by six-month period",
-    x = "Six-month period",
-    y = expression(s^2)
-  ) +
-  # scale_y_continuous(limits = c(0, 5e-04), expand = c(0,0)) +
-  theme(
-    # panel.grid = element_blank(),
-    # panel.grid.major.y = element_blank(),
-    # panel.grid.minor.y = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.x     = element_text(angle = 45, hjust = 1),
-    legend.position = "none",
-  )
-
-# Stack vertically with aligned x-axis
-(p_box_el4 / p_var_el4) +
-  plot_layout(heights = c(1, 1))
-```
-
-```{r element4-vio-bar, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Distributions and variability of cleaned log-returns across six-month periods. Top: boxplot summaries of $z_n$ for each period. Bottom: corresponding sample variances $s^2$, highlighting relative differences in spread."}
-
-p_violin <- ggplot(combined_df_el3, aes(x = Period, y = z_value, fill = Period)) +
-  geom_violin(trim = TRUE, colour = "grey20", alpha = 0.4) +
-  geom_boxplot(
-    width = 0.2,
-    outlier.size = 0.5,
-    fill = "white",
-    colour = "black"
-  ) +
-  scale_fill_viridis_d() +
-  theme_bw() +
-  labs(
-    title = "Distribution of log-returns across six-month periods",
-    x = NULL,
-    y = expression(z[n])
-  ) +
-  theme(
-    # panel.grid = element_blank(),
-    # panel.grid.major.y = element_blank(),
-    # panel.grid.minor.y = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.x     = element_blank(),
-    axis.ticks.x    = element_blank(),
-    legend.position = "none"
-  )
-
-p_var <- ggplot(var_df, aes(x = Period, y = Variance, fill = Period)) +
-  geom_col(alpha = 0.95) +
-  scale_fill_viridis_d() +
-  theme_bw() +
-  labs(
-    title = "Sample variance of log-returns by six-month period",
-    x = "Six-month period",
-    y = expression(s^2)
-  ) +
-  theme(
-    # panel.grid = element_blank(),
-    # panel.grid.major.y = element_blank(),
-    # panel.grid.minor.y = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.x     = element_text(angle = 45, hjust = 1),
-    legend.position = "none"
-  )
-
-# Stack vertically with aligned x-axis
-(p_violin / p_var) +
-  plot_layout(heights = c(1, 1))
-```
-
-<!-- ### Bootstrapping confidence intervals for $\sigma^2$ -->
-
-```{r var-ci, echo=FALSE, message=FALSE, warning=FALSE}
-# Create summary table
-var_ci_table <- data.frame(
-  Subsample = c("Min variance", "Max variance"),
-  Period = c(min_period_label, max_period_label),
-  s2        = c(var(min_var_sample),
-                var(max_var_sample)),
-  CI_lower  = c(var_ci_min_bca[1],
-                var_ci_max_bca[1]),
-  CI_upper  = c(var_ci_min_bca[2],
-                var_ci_max_bca[2])
-)
-
-fmt <- function(x) formatC(x, format = "f", digits = 6)
-
-var_ci_table_disp <- var_ci_table %>%
-  mutate(
-    s2       = paste0("$", fmt(s2), "$"),
-    CI_lower = paste0("$", fmt(CI_lower), "$"),
-    CI_upper = paste0("$", fmt(CI_upper), "$")
-  )
-
-kable(
-  var_ci_table,
-  col.names = c(
-    "Subsample",
-    "Six-month period",
-    "Sample variance",
-    "95\\% CI lower",
-    "95\\% CI upper"
-  ),
-  booktabs = TRUE,
-  align = c("l", "l", "r", "r", "r"),
-  escape = FALSE,
-  digits = 6,
-  caption = "Bootstrap bias-corrected and accelerated 95\\% confidence intervals for the sample variance $s^2$ in the six-month periods with minimum and maximum sample variance."
-) %>%
-  kable_styling(full_width = FALSE, position = "center")
-
-# kable(
-#   var_ci_table,
-#   caption = "Bootstrap BCa 95\\% confidence intervals for the variance $s^2$ in the six-month periods with the smallest and largest sample variance of log-returns.",
-#   booktabs = TRUE,
-#   align = c("l", "r", "r", "r"),
-#   escape = FALSE
-# ) |>
-#   kable_styling(full_width = FALSE, position = "center")
 ```
 
 ```{r testing-anualised-data, echo=FALSE}
@@ -1829,6 +1685,58 @@ min_period_label <- period_labels[min_var_loc]
 max_period_label <- period_labels[max_var_loc]
 ```
 
+
+```{r var-ci, echo=FALSE, message=FALSE, warning=FALSE}
+# Bootstrapping confidence intervals for $\sigma^2$ 
+# Create summary table
+var_ci_table <- data.frame(
+  Subsample = c("Min variance", "Max variance"),
+  Period = c(min_period_label, max_period_label),
+  s2        = c(var(min_var_sample),
+                var(max_var_sample)),
+  CI_lower  = c(var_ci_min_bca[1],
+                var_ci_max_bca[1]),
+  CI_upper  = c(var_ci_min_bca[2],
+                var_ci_max_bca[2])
+)
+
+fmt <- function(x) formatC(x, format = "f", digits = 6)
+
+var_ci_table_disp <- var_ci_table %>%
+  mutate(
+    s2       = paste0("$", fmt(s2), "$"),
+    CI_lower = paste0("$", fmt(CI_lower), "$"),
+    CI_upper = paste0("$", fmt(CI_upper), "$")
+  )
+
+# kable(
+#   var_ci_table,
+#   col.names = c(
+#     "Subsample",
+#     "Six-month period",
+#     "Sample variance",
+#     "95\\% CI lower",
+#     "95\\% CI upper"
+#   ),
+#   booktabs = TRUE,
+#   align = c("l", "l", "r", "r", "r"),
+#   escape = FALSE,
+#   digits = 6,
+#   caption = "Bootstrap bias-corrected and accelerated 95\\% confidence intervals for the sample variance $s^2$ in the six-month periods with minimum and maximum sample variance."
+# ) %>%
+#   kable_styling(full_width = FALSE, position = "center")
+
+# kable(
+#   var_ci_table,
+#   caption = "Bootstrap BCa 95\\% confidence intervals for the variance $s^2$ in the six-month periods with the smallest and largest sample variance of log-returns.",
+#   booktabs = TRUE,
+#   align = c("l", "r", "r", "r"),
+#   escape = FALSE
+# ) |>
+#   kable_styling(full_width = FALSE, position = "center")
+```
+
+
 ```{r testing-table-rename, echo=FALSE}
 var_ci_table <- data.frame(
   Subsample = c("Min variance", "Max variance"),
@@ -1847,87 +1755,141 @@ var_ci_table_disp <- var_ci_table |>
     CI_upper = paste0("$", fmt(CI_upper), "$")
   )
 
-kable(
-  var_ci_table,
-  col.names = c("Subsample", "Six-month period",
-                "Annualised variance $s^2$ (×252)",
-                "95\\% CI lower", "95\\% CI upper"),
-  booktabs = TRUE, 
-  align = c("l","l","r","r","r"),
-  escape = FALSE, 
-  digits = 3,
-  caption = "BCa 95\\% confidence intervals for annualised variance in the six-month periods with minimum and maximum variance."
-) |>
-  kable_styling(full_width = FALSE, position = "center")
+# kable(
+#   var_ci_table,
+#   col.names = c("Subsample", "Six-month period",
+#                 "Annualised variance $s^2$ (×252)",
+#                 "95\\% CI lower", "95\\% CI upper"),
+#   booktabs = TRUE, 
+#   align = c("l","l","r","r","r"),
+#   escape = FALSE, 
+#   digits = 3,
+#   caption = "BCa 95\\% confidence intervals for annualised variance in the six-month periods with minimum and maximum variance."
+# ) |>
+#   kable_styling(full_width = FALSE, position = "center")
 ```
 
-<!-- ### Commenting on overlap -->
 
-<!-- ### Instructions (to be removed later) -->
 
-<!-- _Use the same subsamples as for Element 3. Use a suitable illustration to -->
-<!-- compare the spread of your subsamples. Identify the six-month period with the -->
-<!-- largest sample variance and the six-month period with the smallest sample -->
-<!-- variance. Use bootstrapping/resampling to construct a 95% confidence interval -->
-<!-- for_ $\sigma^2$ for each of these two subsamples separately. Comment on any -->
-<!-- perceived overlap between these intervals. -->
+While the mean return remains stable (\S\@ref(elementThr)), visual inspection of 
+the log-returns reveals distinct regimes of volatility. 
+Figure \@ref(fig:element4-box-bar) displays the sample variance ($s_n^{2}$) for 
+each six-month period below the boxplots from \S\@ref(elementThr), highlighting 
+these fluctuations.
 
-### Analysis... (!change)
 
-!BE note: scaling 6-month volatility/variance estimates to an annual basis so 
-the numbers are easier to interpret and comparable (~126 trading days per 6M).
-Have assumed the following:
+```{r element4-box-bar, echo=FALSE, message=FALSE, warning=FALSE, fig.height=5.0, fig.cap="Distributions and variability of cleaned log-returns across six-month periods. Top: boxplot summaries of $z_n$ for each period. Bottom: corresponding sample variances $s_{n}^2$, highlighting relative differences in spread."}
+# replotting box plot from investigation of constant mean above new variance bar
+# chart
 
-$$
-\hat{\mu}_{\text{annual}} = \hat{\mu}_{\text{daily}} \times 252
-$$
-$$
-\hat{\sigma}_{\text{annual}}^2 = \hat{\sigma}_{\text{daily}}^2 \times 252
-$$
-$$
-\hat{\sigma}_{\text{annual}} = \hat{\sigma}_{\text{daily}} \times \sqrt{252}
-$$
+# boxplot
+p_box_el4 <- ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
+  geom_boxplot(width = 0.75, outlier.size = 0.7, linewidth   = 0.3) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(
+    title = "Daily Nasdaq log-returns per six-month period from 2018-2024",
+    x = NULL,
+    y = expression(z[n])
+  ) +
+  theme(
+    # panel.grid = element_blank(),
+    # panel.grid.major.y = element_blank(),
+    # panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.text.x     = element_blank(),
+    axis.ticks.x    = element_blank(),
+  )
 
-The six-month period with the largest sample variance is
-`r names(z_list)[min_var_loc]` and the six-month period with the smallest sample
-variance is `r names(z_list)[max_var_loc]`.
+p_var_el4 <- ggplot(var_df_annual, aes(x = Period, y = Variance, fill = Period)) +
+  # scale_fill_viridis_d() +
+  geom_col(fill = "white", colour = "black", width = 0.75, linewidth   = 0.3) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(
+    title = "Annualised Nasdaq log-return variance per six-month period from 2018-2024",
+    x = "Six-month period",
+    y = expression(Annualised ~ s[n]^2)
+  ) +
+  # scale_y_continuous(limits = c(0, 5e-04), expand = c(0,0)) +
+  theme(
+    # panel.grid = element_blank(),
+    # panel.grid.major.y = element_blank(),
+    # panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.text.x     = element_text(angle = 45, hjust = 1),
+    legend.position = "none",
+  )
 
-!Paragraph here describing the method that we used to address each point we are
-asked about
+# Stack vertically with aligned x-axis
+(p_box_el4 / p_var_el4) +
+  plot_layout(heights = c(2, 3))
+```
 
-The 95% bias-corrected and accelerated (BCa) confidence intervals (CI) for the
-variance ($\sigma^2$) for each of these two subsamples are shown in Table
-\@ref(tab:var-ci). There is no overlap between the 95% CI for the 6-month ranges
-with the minimum and maximum variance
-[`r formatC(var_ci_min_bca[1], format = "fg", digits = 4)`,
-`r formatC(var_ci_min_bca[2], format = "fg", digits = 4)`] and
-[`r formatC(var_ci_max_bca[1], format = "fg", digits = 4)`,
-`r formatC(var_ci_max_bca[2], format = "fg", digits = 4)`], respectively. Or in
-scientific notation the 95% CI for the minimum variance subsample is
-[`r formatC(var_ci_min_bca[1], format = "e", digits = 2)`,
-`r formatC(var_ci_min_bca[2], format = "e", digits = 2)`] and the 95% CI for the
-maximum variance subsample is
-[`r formatC(var_ci_max_bca[1], format = "E", digits = 2)`,
-`r formatC(var_ci_max_bca[2], format = "E", digits = 2)`].
+The assumption of constant variance, $\sigma^{2}$, was assessed by comparing the
+periods exhibiting the most extreme behavior:
 
-This finding provides statistical evidence that the true variance $\sigma^2$ is
-not the same in both periods. We have evidence therefore to reject the
-assumption of constant variance in these data.
+- Minimum variance: `r names(z_list)[min_var_loc]`
+- Maximum variance: `r names(z_list)[max_var_loc]`
 
-!BE note: check to see if can make this statement about CI's NOT overlapping.
-Know that have to be careful about the statements made here.
+To ease interpretation, daily variance estimates were annualised using 
+Equation \@ref(eq:varAnnualisation),
 
-<!-- $\big[`r formatC(var_ci_min_bca[1], format = "fg", digits = 4,small.mark = " ", small.interval = 5L)`, -->
+\begin{equation}
+  (\#eq:varAnnualisation)
+  s_{\text{annual}}^2 = s_{\text{daily}}^2 \times 252
+\end{equation}
 
-<!-- `r formatC(var_ci_min_bca[2], format = "fg", digits = 4,small.mark = " ", small.interval = 5L)`\big]$ -->
+Ninety-five percent CIs were constructed for the annualised variance of the 
+periods with the largest and smallest variance using a BCa bootstrap with 
+5,000 replications. 
 
-<!-- and -->
+As shown in Table \@ref(tab:element4-final-table), the CI do not overlap.
+The 95% CI for the lowest volatility period 
+`r format_interval(ci_min_95[1], ci_min_95[2], 3)` 
+lies entirely below the interval for the high-volatility period 
+`r format_interval(ci_max_95[1], ci_max_95[2], 3)`. 
 
-<!-- $\big[`r formatC(var_ci_max_bca[1], format = "fg", digits = 4,small.mark = " ", small.interval = 5L)`, -->
+This separation provides statistical evidence that the underlying variances are
+distinct. We therefore reject the assumption of constant variance at the 95%
+confidence level. This result corroborates the visual observations made in
+\S\@ref(elementThr), confirming the presence of volatility clustering
+[@Mandelbrot1963].
 
-<!-- `r formatC(var_ci_max_bca[2], format = "fg", digits = 4,small.mark = " ", small.interval = 5L)`\big]$, -->
 
-<!-- respectively. -->
+```{r element4-final-table, echo=FALSE}
+final_table_df <- data.frame(
+  Subsample = c("Min variance", "Max variance"),
+  Period    = c(min_period_label, max_period_label),
+  s2_ann    = c(s2_min_ann, s2_max_ann),
+  ci        = c(
+                format_interval(ci_min_95[1], ci_min_95[2], 3), 
+                format_interval(ci_max_95[1], ci_max_95[2], 3)
+                )
+)
+
+kable(
+  final_table_df,
+  col.names = c(
+    "Subsample", 
+    "Six-month period",
+    "Point Estimate",
+    "95% CI"
+  ),
+  booktabs = TRUE,
+  digits = 3,
+  align = c("l", "l", "r", "c"),
+  caption = "Comparison of annualised variance for the lowest and highest volatility periods. Ninety-five percent CIs were calculated using BCa bootstrapping (N=5,000)."
+) %>%
+  add_header_above(c(" " = 2, "Annualised Variance" = 2)) %>% 
+  kable_styling(
+      full_width = FALSE, 
+      position = "center",
+      latex_options = "hold_position"
+    )
+```
 
 ```{=latex}
 \clearpage
@@ -1953,25 +1915,8 @@ Know that have to be careful about the statements made here.
 <!-- whether the classification of_ $z_{n}$ _is dependent on the classiﬁcation of_ -->
 <!-- $z_{n−1}$. -->
 
-### Data preparation
+<!-- ### Data preparation -->
 
-Want to test fourth assumption - the $z_n$ increments are independent of each
-other.
-
-Test for dependence between $z_n$ and its immediate predecessor, $z_{n-1}$.
-
-Test of the Efficient Markets Hypothesis, which implies that past returns
-($z_{n-1}$) should not predict future returns ($z_n$)
-
-<!-- # ```{r format-p-values} -->
-
-<!-- # # BE note: can move this up, but have put here to discuss -->
-
-<!-- # # want to ask Russell -->
-
-<!-- # format.pval(one$p.value, eps = 0.0001, scientific = FALSE) -->
-
-<!-- # ``` -->
 
 ```{r Element 5, echo=FALSE}
 # ==============================================================================
@@ -2015,6 +1960,86 @@ if (any(chisq_result$expected < 5)) {
 }
 ```
 
+The Efficient Market Hypothesis (EMH) posits that asset prices instantaneously 
+reflect all available information, preventing investors from profiting via 
+information asymmetries. Consequently, log-returns must be serially independent
+- past performance ($z_{n-1}$) cannot predict future outcomes ($z_n$).
+
+To test this, log-returns were partitioned into four categories based on sample
+quartiles (Table \@ref(tab:element5-classification-table)) and analysed using
+Pearson’s Chi-Squared Test of Independence. The hypotheses are defined as:
+$$
+\begin{cases}
+H_0: \text{The quartile classification of } z_n \text{is independent of }z_{n-1} \\ 
+H_1: \text{The quartile classification of } z_n \text{depends upon }z_{n-1}
+\end{cases}
+$$
+
+```{r element5-classification-table, echo=FALSE}
+# Create dataframe for the definitions
+quartile_def <- data.frame(
+  Category = c("Q1", "Q2", "Q3", "Q4"),
+  Range    = c("$z_n \\le Q_1$", 
+               "$Q_1 < z_n \\le Q_2$", 
+               "$Q_2 < z_n \\le Q_3$", 
+               "$z_n > Q_3$")
+)
+
+kable(
+  quartile_def,
+  col.names = c("Category", "Mathematical Range"),
+  align = c("c", "c", "l"),
+  escape = FALSE, 
+  booktabs = TRUE,
+  caption = "Classification of log-returns into discrete categories based on sample quartiles."
+) %>%
+  kable_styling(
+    full_width = FALSE, 
+    position = "center",
+    latex_options = "hold_position"
+    )
+```
+Table \@ref(tab:contingency-table) displays the observed frequencies. All 
+expected cell frequencies exceed 5, satisfying the assumptions for the 
+Chi-squared approximation.
+
+The test result was $\chi^{2}_{\text{`r chisq_result$parameter`}}$ =
+`r formatC(unname(chisq_result$statistic), format = "f", digits = 2)` 
+(p `r format_p_vals(chisq_result$p.value)`). We therefore reject the null 
+hypothesis. The significant dependence between consecutive returns suggests that 
+historical price information remains predictive. This lack of serial 
+independence contradicts the assumption of independent increments, providing 
+evidence against the EMH.
+
+```{r contingency-table-expected, echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+# get expected counts
+expected_matrix <- chisq_result$expected
+
+expected_df <- as.data.frame.matrix(expected_matrix)
+expected_df <- tibble::tibble(
+  `$z_{n-1}$ quartile` = rownames(expected_matrix),
+  expected_df
+)
+
+kable(
+  expected_df,
+  caption = "Expected cell frequencies under the null hypothesis of serial independence.",
+  booktabs = TRUE,
+  digits = 1,  
+  align = c("l", rep("r", 4)),
+  escape = FALSE
+) |>
+  add_header_above(
+    c(" " = 1, "$z_n$ quartile" = 4),
+    escape = FALSE
+  ) |>
+  kable_styling(
+    full_width = FALSE, 
+    position = "center",
+    latex_options = "hold_position"
+    )
+```
+
 ```{r contingency-table, echo=FALSE, message=FALSE, warning=FALSE}
 con_table_df <- as.data.frame.matrix(con_table)
 
@@ -2034,36 +2059,12 @@ kable(
     c(" " = 1, "$z_n$ quartile" = 4),
     escape = FALSE
   ) |>
-  kable_styling(full_width = FALSE, position = "center")
+  kable_styling(
+    full_width = FALSE, 
+    position = "center",
+    latex_options = "hold_position"
+    )
 ```
-
-None of the cell frequencies are \<5 so we can use chi-squared test.
-
-All expected cell frequencies exceed 5, so the assumptions for Pearson’s
-chi-squared test of independence are satisfied.
-
-!BE note: talk about robustitity of Pearson's chi-squared test... Is it fragile?
-
-The null hypothesis ($H_0$) for both tests is that the row and column variables
-are independent - here that the categorical distribution of the current
-log-return $z_n$ is independent of the distribution of the lagged log-return
-$z_{n-1}$.
-
-Pearson’s chi-squared test of independence: The hypotheses are defined as:
-$$
-\begin{cases}
-H_0: \text{Today's quartile is independent of yesterday's} \\ 
-H_1: \text{Today's quartile is dependent on yesterday's} 
-\end{cases}
-$$
-
-The test returns $\chi^2$(\text{df} = `r chisq_result$parameter`) =
-`r formatC(unname(chisq_result$statistic), format = "f", digits = 2)` with !p
-`r format.pval(chisq_result$p.value, eps = 0.0001, scientific = FALSE)`
-(p=`r formatC(chisq_result$p.value, format = 'e', digits = 3)`), so we reject
-$H_0$. This provides statistical evidence that $z_n$ is dependent on the
-classification of $z_{n-1}$ and this finding does not not support the Efficient
-Markets Hypothesis.
 
 ```{=latex}
 \clearpage
@@ -2334,7 +2335,7 @@ appendix_p1 <- ggplot(nasdaq_data_full, aes(x = date)) +
       "-day rolling window)"
       ),
     x = "Date",
-    y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+    y = bquote( s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   # not visible when included so commented out
   # outlier_shading +
@@ -2365,7 +2366,7 @@ appendix_p2 <- ggplot(
       "-day rolling window)"
       ),
     x = "Date",
-    y = bquote( sigma[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+    y = bquote( s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   ylim(0.01, 0.99) +
   # theme(legend.position = "none") +
@@ -2383,7 +2384,7 @@ A threshold of 0.70 (70% annualised volatility) was selected. Note that
 annualised volatility can exceed 100%. This metric represents the standard
 deviation of daily log-returns scaled to an annual timeframe 
 $$
-\sigma_{ann} = \sigma_{daily} \times \sqrt{252}
+\hat{\sigma}_{ann} = \hat{\sigma}_{daily} \times \sqrt{252}
 $$
 As shown in Figure \@ref(fig:nasdaqAllTimeVol), breaches of the 0.70 level
 isolate only five distinct 'systemic shock' events over the last 50 years:
@@ -2464,6 +2465,7 @@ H_1: F_i(x) \le F_j(x) \quad \text{for at least one pair } (i,j) \\
 \qquad \text{(At least one period stochastically dominates another)}
 \end{cases}
 $$
+
 
 
 ```{=latex}
