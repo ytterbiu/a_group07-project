@@ -1468,28 +1468,20 @@ kable(
   kable_styling(full_width = FALSE, position = "center")
 ```
 
-To evaluate the assumption that the log-returns $z_n$ possess a constant mean,
-$\mu$, the log-returns data were partitioned into fourteen 6-month periods. As
-shown in Table \@ref(tab:daysPerSixMonthPeriod), the Jan 2020 - Jul 2020 window
-contains fewer observations (n=`r min(days_per_period)`) following data
-cleaning. However, all subsamples remain sufficiently large
-(n>`r floor(min(days_per_period) / 10) * 10`) 
-to yield reliable statistical estimates.
+To evaluate the assumption of a constant mean,
+$\mu$, the log-returns were partitioned into fourteen 6-month periods. While 
+sample sizes varied, all subsamples remained sufficiently large 
+(n>`r floor(min(days_per_period) / 10) * 10`) to yield reliable statistical 
+estimates (Table \@ref(tab:daysPerSixMonthPeriod)).
 
-Given the significant departures from normality established in
-\S\@ref(elementOne) & \@ref(elementTwo), parametric methods, such as Analysis of
-Variance are inappropriate. The Kruskal-Wallis rank sum test was 
-implemented to determine whether the log-returns across the 6-month periods 
-originate from the same distribution [@hollander2013nonparametric]. 
-
-The interpretation of the Kruskal-Wallis test depends on the homogeneity of
-variance across groups. The assumption of constant variance is tested in
-\S\@ref(elementFou) (and may not hold given the volatility clustering observed
-in Figure \@ref(fig:element3-boxplot)), so one cannot rely on the strict
-assumption that the distributions share identical shapes. The Kruskal-Wallis 
-test is therefore interpreted in its most general form: assessing
-differences in mean ranks (stochastic dominance) rather than a strict equality
-of medians. The hypotheses are defined as:
+Given the departures from normality established in \S\@ref(elementOne) &
+\@ref(elementTwo), the non-parametric Kruskal-Wallis rank sum test was employed
+rather than ANOVA. As Figure \@ref(fig:element3-boxplot) exhibits volatility 
+clustering, indicated unequal variances (something tested formally in 
+\S\@ref(elementFou)), the Kruskal-Wallis must be interpreted in its general 
+form: assessing differences in mean ranks
+(stochastic dominance) rather than strict equality of medians.[^kruskal-wallis]
+The hypotheses are defined as:
 
 $$
 \begin{cases}
@@ -1502,16 +1494,17 @@ $$
 The Kruskal–Wallis test statistic was 
 $\chi^{2}_{\text{`r signif(kruskal_res$parameter[[1]], 3)`}}$ =
 `r signif(kruskal_res$statistic[[1]], 4)`
-(p `r format_p_vals(kruskal_res$p.value)`). There is insufficient evidence to reject the null hypothesis at the 95%
-confidence level.
+(p `r format_p_vals(kruskal_res$p.value)`), providing insufficient evidence to
+reject the null hypothesis at the 95% confidence level. There are no 
+statistically significant differences in the mean ranks of log-returns across
+periods. This supports the assumption of a constant mean $\mu$.
 
-There are no statistically significant differences in the mean ranks of the
-log-returns across the fourteen 6-month periods. This suggests that while the 
-volatility (variance) may fluctuate over time, the location of the distribution 
-remains stable. The Nasdaq does not exhibit 6-month periods where log-returns are 
-systematically higher or lower on average, supporting the assumption of a 
-constant mean $\mu$. Crucially, the visual evidence of volatility clustering 
-indicates that this stability does not extend to the variance.
+<!-- Crucially, the visual evidence of volatility clustering  -->
+<!-- indicates that this stability does not extend to the variance. -->
+```{=latex}
+\newpage
+```
+
 
 ```{r element3-boxplot, echo=FALSE, fig.height=3.4, fig.pos='!ht', fig.cap = "Boxplots showing the distribution of Nasdaq log-returns partitioned into fourteen six-month intervals (Jan 2018 – Dec 2024)."}
 ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
@@ -1524,6 +1517,7 @@ ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
   ) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+
 
 ```{r daysPerSixMonthPeriod, echo=FALSE, message=FALSE, warning=FALSE}
 kable(
@@ -1540,9 +1534,13 @@ kable(
 ) |>
   kable_styling(
     full_width = FALSE,
-    position = "center"
+    position = "center",
+    latex_options = c("repeat_header"),
+    repeat_header_text = "\textit{(continued)}",
+    repeat_header_method = "append",
   )
 ```
+
 
 ```{=latex}
 \clearpage
@@ -2440,17 +2438,33 @@ knitr::include_graphics("fig/appendix-COVID19-selection-3.pdf")
 
 <!-- tools::showNonASCIIfile("your_file.Rmd") -->
 
-## Statistical test selection {#apd-test-rationale}
+## Kruskal-Wallis hypotheses under general alternatives {#apd-Kruskal-Wallis}
 
-### Test of normality (\S\@ref(elementOne)) 
+The Kruskal-Wallis test assesses whether $k$ independent samples originate from
+the same distribution. When the assumption of homogeneity of variance is not
+assumed, as in the case of \S\@ref(elementThr) the test evaluates stochastic
+dominance rather than a simple shift in location parameter
+[@hollander2013nonparametric, Sec. 6.1].
 
-Three tests for normality were considered, the ... 
+The definition of first-order stochastic dominance is as follows:
 
-Their use cases are outlined in the Table below (Table xx).
+- Let $X$ and $Y$ be two R.V.
+- $X$ stochastically dominates $Y$ if
+$$
+F_X(t) \leq F_Y(t) \quad \text{for all }t
+$$
 
-For this report, the data were found to be (put stats from section 1).  
-Test AD was suitable. 
-Therefore test 1 wasn't suitable because y and test 2 was not suitable because of z.
+An alternative way of expressing the Kruskal-Wallis test hypotheses are:
+$$
+\begin{cases}
+H_0: F_1(x) = \dots = F_{14}(x) \quad \text{for all } x \\
+\qquad \text{(The distributions of log-returns are identical across all periods)} \\
+\\
+H_1: F_i(x) \le F_j(x) \quad \text{for at least one pair } (i,j) \\
+\qquad \text{(At least one period stochastically dominates another)}
+\end{cases}
+$$
+
 
 ```{=latex}
 \newpage
@@ -2609,3 +2623,6 @@ introduction, elements 1-6, and the conclusion.
     debatable. This is discussed further in Appendix 
     \S\@ref(apd-outlier-selection).
 
+[^kruskal-wallis]:
+    See Appendix \S\@ref(apd-Kruskal-Wallis) and @hollander2013nonparametric for 
+    details on the general alternative hypothesis.
