@@ -2094,9 +2094,17 @@ kable(
 ```{r Element 6 - proportion of positive increments, echo=FALSE}
 num_positive <- sum(z_n_clean > 0)
 total_days <- length(z_n_clean)
+
 # test using binomial (could also approximate, but Russell normally says
 # 'why approximate when you can calculate' so opted for that here)
 binom_res <- binom.test(num_positive, total_days, p = 0.5, alternative = "greater")
+
+# BE note: In element 5 we showed that returns are dependent but using a 
+# Binomial we assume they are independent. 
+# The below is using the normal approximation
+# prop.test(num_positive, total_days, p = 0.5, correct = FALSE)
+# This returns a p-value of ~2.28*10^-6
+
 
 #------------------- Element 6: persistence of trends
 # use run length encoding
@@ -2121,122 +2129,86 @@ mean_neg_run <- mean(neg_run_lengths)
 wilcox_res <- wilcox.test(pos_run_lengths, neg_run_lengths, alternative = "greater")
 ```
 
-### Proportion of positive increments
+To assess the general tendency of the Nasdaq index, the proportion of days with 
+a positive return were analysed. The observed proportion was 
+`r formatC(num_positive / total_days, format = "fg", digits = 3)` (or 
+`r formatC(num_positive*100 / total_days, format = "fg", digits = 3)`%), 
+suggesting a slight upward bias.
 
-The proportion of days with a positive log-return is
-`r formatC(num_positive / total_days, format = "fg", digits = 4)`.
+To formally assess this directional bias, an Exact Binomial Test (equivalently,
+the Sign Test) was used to determine whether the median
+log-return is significantly greater than zero by treating each day as a
+Bernoulli trial, avoiding the normality assumptions required by a
+$t$-test. While the serial dependence established in \S\@ref(elementFiv) implies
+that the assumption of independent trials is an approximation, the test remains
+a valid descriptive metric for the Nasdaq's general drift. The hypotheses are
+defined as:
 
-A one tailed binomial test was used to calculate the probability of this
-occurring assuming a null hypothesis, $H_0$, of $p=0.5$ ($H_1: \; p>0.5$)
-
-The hypotheses are defined as:
 $$
 \begin{cases}
-H_0: \text{Probability of a positive return is } \le 0.5 & (p \le 0.5) \\
-H_1: \text{Probability of a positive return is } > 0.5 & (p > 0.5)
+H_0: p \le 0.5 \qquad (\text{Median log-return } \le 0) \\
+H_1: p > 0.5 \qquad (\text{Median log-return is } > 0)
 \end{cases}
 $$
+<!-- An Exact Binomial test was used to formally test whether this exceeds random  -->
+<!-- chance (p=0.5). While the previous finding of serial dependence  -->
+<!-- (\S\@ref(elementFiv)) implies the assumption of independent Bernoulli trials is  -->
+<!-- an approximation, the test remains a valid descriptive metric for the index's  -->
+<!-- directional drift. The hypotheses are defined as: -->
+<!-- $$ -->
+<!-- \begin{cases} -->
+<!-- H_0: \text{Probability of a positive return is } \le 0.5 & (p \le 0.5) \\ -->
+<!-- H_1: \text{Probability of a positive return is } > 0.5 & (p > 0.5) -->
+<!-- \end{cases} -->
+<!-- $$ -->
+The test returned p `r format_p_vals(binom_res$p.value)`. We therefore reject
+the null hypothesis - the Nasdaq exhibits a statistically significant upward 
+bias (towards positive returns) over 2018-2024. 
 
-
-The exact binomial test assumes:
-
-- Each day is classified as a binary outcome (success = positive return, failure
-  = non-positive return).
-- The sequence of days can be treated as approximately independent Bernoulli
-  trials.
-- The success probability p is constant over the period.
-- The number of trials is fixed in advance.
-
-These conditions are met here, however for financial data the independence and
-constant- p assumptions are only approximate (because of possible serial
-dependence and time-varying volatility). The test is still a reasonable first
-descriptive check for the 'upwardness' of the index.
-
-The binomial test found p `r format_p_vals(binom_res$p.value)` so we reject
-$H_0$ in favour of alternative hypothesis that the true proportion of days with
-positive increments is greater than 0.5. This confirms a general upward bias.
-
-### Persistence of trends
-
-A second question is whether upward movements tend to persist longer than
-downward movements. Test hypothesis that positive runs (consecutive $z_n > 0$)
-have a longer mean duration than negative runs (consecutive $z_n < 0$)
-
-The mean length of positive runs is
+The persistence of trends was investigated by comparing sequences of
+consecutive days with the same sign ('runs'). The mean length of positive runs
+is
 `r formatC(mean_pos_run, format = "fg", digits = 3)` days, compared with
 `r formatC(mean_neg_run, format = "fg", digits = 3)` days for negative runs.
 
-A one-sided Mann-Whitney test (or Wilcoxon Rank-Sum test) was used with the null
-hypothesis, $H_0$, that the mean of positive and negative runs are equal and an
-alternative hypothesis that the mean of positive runs is greater than negative
-runs.
-
-The Mann–Whitney / Wilcoxon rank-sum test assumes:
-
-- Two independent samples (here, the set of positive-run lengths and the set of
-  negative-run lengths).
-- The response is ordinal (run lengths are counts of days).
-- Under $H_0$ the two populations have the same distribution.
-
-
-The Mann–Whitney / Wilcoxon hypotheses are defined as:
+Given that run lengths are discrete, non-negative, and likely skewed, the
+non-parametric Mann-Whitney U (Wilcoxon Rank-Sum) test was used rather than a
+t-test. The Mann-Whitney U test assumes independent samples and assesses whether
+the distribution of positive run lengths stochastically dominates negative run
+lengths. The hypotheses are defined as:
 $$
 \begin{cases}
 H_0: \text{Run lengths have identical distributions}  \\
 H_1: \text{Positive runs tend to be longer} 
 \end{cases}
 $$
+The Mann-Whitney U test returned p `r format_p_vals(wilcox_res$p.value)`,
+providing sufficient evidence to reject the null hypothesis. This confirms that
+upward ("bullish") trends both occur more frequently and persist for more
+sequential days than downward ("bearish") corrections.
 
-<!-- Run lengths are discrete and may not be perfectly independent in a strict time-series sense, but the test is robust to moderate deviations from these assumptions. Because run lengths are non-negative integers and can be skewed, a non-parametric test is more appropriate than a two-sample  -->
-<!-- t-test, which would require approximate normality of run lengths in each group. -->
-
-Wilcoxon rank sum test with continuity correct found p
-`r format_p_vals(wilcox_res$p.value)` so we have sufficient evidence to reject
-the null hypothesis in favour of the alternative hypothesis (the positive runs
-have a shift greater than 0).
 
 ```{=latex}
 \newpage
 ```
 # Conclusions
 
-While the log-normal model was invalidated by the data's non-normality
-(\S\@ref(elementOne) & \S\@ref(elementTwo)), non-constant variance
-(\S\@ref(elementFou)), and lack of independence (\S\@ref(elementFiv)), our
-analysis for \S\@ref(elementThr) did not find statistical evidence to reject the
-assumption of a constant mean.
+This investigation demonstrates that the Nasdaq Composite (2018–2024) violates
+the core assumptions of the classical log-normal random walk. Normality was
+rejected via an Anderson–Darling test and robust BCa bootstrapping.
+The mean return remained stable across six-month intervals, but the assumption
+of constant variance was rejected. Nasdaq log-returns exhibited serial 
+dependence and a systematic positive bias, contradicting the independence 
+required by the EMH.
 
-To be updated:
-
-Based on the Kruskal-Wallis Test the mean log-return appears to be constant over
-time, even as the other core assumptions are violated.
-
-!BE note/summary:
-
-- element 1 (\S\@ref(elementOne)): Anderson-Darling test provides strong
-  evidence that the $z_n$ data are not normally distributed
-- element 2 (\S\@ref(elementTwo)): bootstrapping with z-data and normal
-  distribution also provides evidence against an assumption of normality
-- element 3 (\S\@ref(elementThr)): Kruskal–Wallis test $\therefore$ we accept
-  null hypothesis that measures of central tendancy of log-returns over
-  six-month periods share the same distribution (/medians are the same?)
-- element 4 (\S\@ref(elementFou)): 95% BCa confidence intervals do not overlap,
-  providing statistical evidence that (true) variance is not the same in the
-  minimum and maximum six-month periods of sample variable evaluated
-- element 5 (\S\@ref(elementFiv)): Chi-squared test provided evidence that $z_n$
-  and $z_{n-1}$ are not indendent. BUT haven't checked for $y_{n-1}$ as not sure
-  what this is...
-- element 6 (\S\@ref(elementSix)): Part 1: Binomial test revealed proportion of
-  positive-return days is statistically greater than 50% (insert p \<0.001),
-  confirming a general upward bias. Part 2: Wilcoxon rank sum test with
-  continuity correction provided sufficient statistical evidence (p\<0.001) to
-  reject null hypothesis in favour of alternative hypothesis that the positive
-  runs have a greater mean/median/distribution that the negative runs.
-
-Want to wrap these up into some sort of formal conclusion...
-
-- Something to discuss
-
+This report focused on univariate testing of a single index over a specific
+historical period, and does not account for cross-asset correlations or
+macroeconomic drivers. Future work would prioritise extending this diagnostic
+framework to a broader range of global indices (e.g., S&P 500, FTSE 100) to
+determine if these deviations are idiosyncratic to the Nasdaq or systemic market
+features, combined with fitting and evaluating alternative distributions (such
+as the Student’s $t$ or Generalized Error Distribution) to identify a model that
+more accurately reflects the empirical skewness and kurtosis.
 
 <!-- ```{=html} -->
 <!-- # References -->
@@ -2465,23 +2437,6 @@ H_1: F_i(x) \le F_j(x) \quad \text{for at least one pair } (i,j) \\
 \qquad \text{(At least one period stochastically dominates another)}
 \end{cases}
 $$
-
-
-
-```{=latex}
-\newpage
-```
-
-# Additional results
-
-## Observations per Period 
-
-In \S\@ref(elementThr) the log-returns data were split into six-month periods,
-as shown in Figure \@ref(fig:element3-boxplot).
-
-```{r, echo=FALSE, out.width="70%"}
-# knitr::include_graphics("fig/element3-boxplot-1.pdf")
-```
 
 
 
