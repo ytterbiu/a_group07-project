@@ -29,6 +29,11 @@
 #   - boot
 #   - clipr
 #   - htmltools (only if knitting the rmd file to html)
+# Acknowledgements
+#   - https://gitlab.com/scottkosty/bootstrap/-/blob/master/R/bcanon.R is an
+#     open source implementation of Bias-Corrected and accelerated (BCa)
+#     bootstrap algorithm from [Efron and Tibshirani, 1993], implemented in R
+#     by Kosty [2019]
 # ==============================================================================
 
 
@@ -276,45 +281,9 @@ z_n <- na.omit(z_n)
 #   ('non markov') which I think means it is dependent (idea that the market
 #   has 'memory' whereas a markov frame of reference is that future price only
 #   depends on current price, not path taken to get there*)
-#   - Something to check during office hours (don't fully understand)
 
 
-# # BE note: set eval to false on 19/11/2025 following group meeting
-# # same length as IXIC_ad, first value NA
-#
-# df_initial_ixic <- tibble(
-#   date = index(IXIC_ad),
-#   price = as.numeric(IXIC_ad),
-#   z_n = as.numeric(z_n)
-# ) %>%
-#   drop_na(z_n)
-#
-# date_range <- range(df_initial_ixic$date, na.rm = TRUE)
-#
-# p1_initial_vis <- ggplot(df_initial_ixic, aes(date, price)) +
-#   theme_bw() +
-#   geom_line(linewidth = 0.5) +
-#   labs(
-#     title = "NASDAQ Composite\n (Adjusted Close)",
-#     x = "Date",
-#     y = "Adjusted Close ($)"
-#   )
-#
-# p2_initial_vis <- ggplot(df_initial_ixic, aes(date, z_n)) +
-#   geom_line(linewidth = 0.5) +
-#   theme_bw() +
-#   labs(
-#     title = expression(Log ~ Return ~ Increment ~ (z[n])),
-#     x = "Date",
-#     y = expression(z[n])
-#   )
-#
-# # gridExtra::grid.arrange(p1, p2, ncol = 2)
-# (p1_initial_vis | p2_initial_vis) &
-#   theme(
-#     plot.title = element_text(hjust = 0.5),
-#     plot.margin = margin(5.5, 5.5, 5.5, 5.5)
-#   )
+
 
 # trading_period_days <- 60
 #
@@ -394,155 +363,9 @@ z_n_clean_pre_na_drop <- z_n_clean
 # remove NA increments
 z_n_clean <- na.omit(z_n_clean)
 
-# outlier_df <- tibble(
-#   id     = seq_along(outlier_periods_to_remove),
-#   period = outlier_periods_to_remove
-# ) %>%
-#   tidyr::separate(period, into = c("start", "end"), sep = "/", convert = TRUE) %>%
-#   mutate(
-#     start = as.Date(start),
-#     end   = as.Date(end),
-#     mid   = start + floor(as.numeric(end - start) / 2),
-#     label = as.character(id)
-#   )
-#
-# df <- tibble(
-#   date  = index(IXIC_ad),
-#   price = as.numeric(IXIC_ad),
-#   z_n   = as.numeric(z_n)
-# ) %>%
-#   drop_na(z_n)
-#
-# range_p1 <- range(df$price, na.rm = TRUE)
-# range_p2 <- range(df$z_n,   na.rm = TRUE)
-#
-# label_y_p1 <- range_p1[2] - 0.08 * diff(range_p1)
-# label_y_p2 <- range_p2[2] - 0.02 * diff(range_p2)
-# # label_y_p1 <- label_y_p1*1.02
-# # label_y_p2 <- label_y_p2*1.2
-#
-# base_theme <- theme_bw() +
-#   theme(
-#     plot.title  = element_text(hjust = 0.5),
-#     plot.margin = margin(5.5, 5.5, 5.5, 5.5)
-#   )
-#
-# p1 <- ggplot(df, aes(date, price)) +
-#   geom_line() +
-#   labs(
-#     title = "NASDAQ Composite\n(Adjusted Close)",
-#     x = "Date", y = "Adjusted Close ($)"
-#   ) +
-#   base_theme +
-#   # vertical dotted lines
-#   geom_vline(
-#     data = outlier_df,
-#     aes(xintercept = start),
-#     linetype = "dotted"
-#   ) +
-#   geom_vline(
-#     data = outlier_df,
-#     aes(xintercept = end),
-#     linetype = "dotted"
-#   ) +
-#   # circles
-#   geom_point(
-#     data = outlier_df,
-#     aes(x = mid, y = label_y_p1),
-#     inherit.aes = FALSE,
-#     shape = 21,
-#     fill  = "white",
-#     color = "black",
-#     size  = 6,
-#     stroke = 0.6
-#   ) +
-#   # numbers
-#   geom_text(
-#     data = outlier_df,
-#     aes(x = mid, y = label_y_p1, label = label),
-#     inherit.aes = FALSE,
-#     vjust = 0.35,
-#     size = 3
-#   ) #+
-#   #scale_y_continuous(expand = expansion(mult = c(0.02, 0.02)))
-#
-# p2 <- ggplot(df, aes(date, z_n)) +
-#   geom_line() +
-#   labs(
-#     title = expression(Log~Return~Increment~(z[n])),
-#     x = "Date",
-#     y = expression(z[n])
-#   ) +
-#   base_theme +
-#   geom_vline(
-#     data = outlier_df,
-#     aes(xintercept = start),
-#     linetype = "dotted"
-#   ) +
-#   geom_vline(
-#     data = outlier_df,
-#     aes(xintercept = end),
-#     linetype = "dotted"
-#   ) #+
-#   # geom_point(
-#   #   data = outlier_df,
-#   #   aes(x = mid, y = label_y_p2),
-#   #   inherit.aes = FALSE,
-#   #   shape = 21,
-#   #   fill  = "white",
-#   #   color = "black",
-#   #   size  = 6,
-#   #   stroke = 0.6
-#   # ) +
-#   # geom_text(
-#   #   data = outlier_df,
-#   #   aes(x = mid, y = label_y_p2, label = label),
-#   #   inherit.aes = FALSE,
-#   #   vjust = 0.35,
-#   #   size = 3
-#   # ) #+
-#   #scale_y_continuous(expand = expansion(mult = c(0.02, 0.02)))
-#
-# (p1 / p2)
 
-# # We can plot a quick visualisation to compare pre & post outlier removal:
-# df_raw <- tibble(
-#   date = index(z_n),
-#   z_n  = as.numeric(z_n)
-# )
-# df_clean <- tibble(
-#   date = index(z_n_clean_pre_na_drop),
-#   z_n  = as.numeric(z_n_clean_pre_na_drop)
-# )
-# ylim_all <- range(df_raw$z_n, df_clean$z_n, na.rm = TRUE)
-#
-#
-# p_raw <- ggplot(df_raw, aes(date, z_n)) +
-#   geom_line() +
-#   theme_bw() +
-#   scale_y_continuous(limits = ylim_all) +
-#   labs(
-#     title = "Log Return Increments\n(pre exclusion)",
-#     x = "Date",
-#     y = expression(z[n])
-#   )
-#
-# p_clean <- ggplot(df_clean, aes(date, z_n)) +
-#   geom_line() +
-#   theme_bw() +
-#   scale_y_continuous(limits = ylim_all) +
-#   labs(
-#     title = "Log Return Increments\n(post exclusion)",
-#     x = "Date",
-#     y = expression(z[n])
-#   )
-#
-# (p_raw | p_clean) &
-#   theme(
-#     plot.title = element_text(hjust = 0.5),
-#     plot.margin = margin(5.5, 5.5, 5.5, 5.5)
-#   )
-#
+
+
 
 #----------------------------- Element 1 - Table ------------------------------#
 # Skewness and excess kurtosis of the cleaned log-returns $z_n$ were computed
@@ -1513,16 +1336,15 @@ kable(
 #------------------- Element 5: independence of increments --------------------#
 # ==============================================================================
 
-# Create a $z_{n-1}$ series
+# create $z_{n-1}$ series
 z_lag <- stats::lag(z_n_clean, k = 1)
 
-# Align $z_n$ and $z_{n-1}$ pairs by merging the xts objects
+# align $z_n$ and $z_{n-1}$ pairs by merging the xts objects
 # inner join to remove the NA value created by the lag
 z_merged <- merge(z_n_clean, z_lag, join = "inner")
 colnames(z_merged) <- c("z_n", "z_n_minus_1")
 
-# Categorise by quartile
-# calculate quartiles from whole z_n_clean dataset
+# Categorise by quartile & calculate quartiles from whole z_n_clean dataset
 q <- quantile(z_n_clean, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
 
 # create categorical variables
@@ -1573,6 +1395,9 @@ kable(
   )
 
 # # get expected counts
+# # BE note: commented out here in the R file because it's not evaluated in the
+# # R Markdown file and the purl function to convert rmd -> r converts everything
+# # with eval = FALSE into comments
 # expected_matrix <- chisq_result$expected
 #
 # expected_df <- as.data.frame.matrix(expected_matrix)
@@ -1663,9 +1488,9 @@ mean_neg_run <- mean(neg_run_lengths)
 
 wilcox_res <- wilcox.test(pos_run_lengths, neg_run_lengths, alternative = "greater")
 
-knitr::include_graphics("fig/appendix-dashboard-1.pdf")
 
-knitr::include_graphics("fig/appendix-dashboard-2.pdf")
+
+
 
 # ==============================================================================
 #----------------------- Appendix: determining outliers -----------------------#

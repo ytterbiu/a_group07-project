@@ -74,6 +74,11 @@ This R Markdown document was created as part of a group assignment for SMM047 at
 #   - boot
 #   - clipr
 #   - htmltools (only if knitting the rmd file to html)
+# Acknowledgements
+#   - https://gitlab.com/scottkosty/bootstrap/-/blob/master/R/bcanon.R is an 
+#     open source implementation of Bias-Corrected and accelerated (BCa) 
+#     bootstrap algorithm from [Efron and Tibshirani, 1993], implemented in R 
+#     by Kosty [2019]
 # ==============================================================================
 
 ```
@@ -344,7 +349,6 @@ z_n <- na.omit(z_n)
 #   ('non markov') which I think means it is dependent (idea that the market 
 #   has 'memory' whereas a markov frame of reference is that future price only
 #   depends on current price, not path taken to get there*)
-#   - Something to check during office hours (don't fully understand)
 
 ```
 
@@ -388,7 +392,7 @@ constant variance, and independence) hold in practice.
 
 <!-- ### Identifying and removing outliers -->
 
-```{r initial-visualisation, fig.cap = "Nasdaq Composite price trend and daily volatility (2018–2024). The left figure shows the daily adjusted closing price. The right figure shows the daily log-returns, highlighting day-to-day percentage changes and volitility.", echo = FALSE, eval = FALSE, include = FALSE}
+```{r initial-visualisation, fig.cap = "Nasdaq Composite price trend and daily volatility (2018–2024). The left figure shows the daily adjusted closing price. The right figure shows the daily log-returns, highlighting day-to-day percentage changes and volitility.", echo = FALSE, eval = FALSE, include = FALSE, purl=FALSE}
 # BE note: set eval to false on 19/11/2025 following group meeting
 # same length as IXIC_ad, first value NA
 
@@ -511,7 +515,7 @@ z_n_clean_pre_na_drop <- z_n_clean
 z_n_clean <- na.omit(z_n_clean)
 ```
 
-```{r regions-to-be-removed, eval = FALSE, echo = FALSE, fig.width=6, fig.height=6, fig.cap = "Initial visualisation and regions selected for removal", }
+```{r regions-to-be-removed, eval = FALSE, purl=FALSE,  echo = FALSE, fig.width=6, fig.height=6, fig.cap = "Initial visualisation and regions selected for removal", }
 outlier_df <- tibble(
   id     = seq_along(outlier_periods_to_remove),
   period = outlier_periods_to_remove
@@ -624,7 +628,7 @@ p2 <- ggplot(df, aes(date, z_n)) +
 (p1 / p2)
 ```
 
-```{r raw-vs-clean, eval = FALSE, echo=FALSE, fig.cap = "Raw vs clean* TBC"}
+```{r raw-vs-clean, eval = FALSE, purl=FALSE, echo=FALSE, fig.cap = "Raw vs clean* TBC"}
 # We can plot a quick visualisation to compare pre & post outlier removal:
 df_raw <- tibble(
   date = index(z_n),
@@ -806,7 +810,7 @@ hypothesis ($H_0$). The Anderson-Darling test provides strong evidence that the
 Nasdaq log-returns are not normally distributed.
 
 
-```{r timeline-fig, echo=FALSE, fig.cap="Notable Nasdaq market events from 2018-2024. Only the period associated with COVID-19 met the numerical criteria for a systemic outlier (see Appendix A for more information).", out.width="80%", fig.align='center', out.width="100%"}
+```{r timeline-fig, echo=FALSE, fig.cap="Notable Nasdaq market events from 2018-2024. Only the period associated with COVID-19 met the numerical criteria for a systemic outlier (see Appendix B for more information).", out.width="80%", fig.align='center', out.width="100%"}
 knitr::include_graphics("fig/timeline2.pdf")
 ```
 
@@ -1856,8 +1860,7 @@ lies entirely below the interval for the high-volatility period
 This separation provides statistical evidence that the underlying variances are
 distinct. We therefore reject the assumption of constant variance at the 95%
 confidence level. This result corroborates the visual observations made in
-\S\@ref(elementThr), confirming the presence of volatility clustering
-[@Mandelbrot1963].
+\S\@ref(elementThr), confirming the presence of volatility clustering.
 
 
 ```{r element4-final-table, echo=FALSE}
@@ -1926,16 +1929,15 @@ kable(
 ```
 
 ```{r Element 5 pt1 - independence of increments, echo=FALSE}
-# Create a $z_{n-1}$ series
+# create $z_{n-1}$ series
 z_lag <- stats::lag(z_n_clean, k = 1)
 
-# Align $z_n$ and $z_{n-1}$ pairs by merging the xts objects
+# align $z_n$ and $z_{n-1}$ pairs by merging the xts objects
 # inner join to remove the NA value created by the lag
 z_merged <- merge(z_n_clean, z_lag, join = "inner")
 colnames(z_merged) <- c("z_n", "z_n_minus_1")
 
-# Categorise by quartile
-# calculate quartiles from whole z_n_clean dataset
+# Categorise by quartile & calculate quartiles from whole z_n_clean dataset
 q <- quantile(z_n_clean, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
 
 # create categorical variables
@@ -2014,6 +2016,9 @@ evidence against the EMH.
 
 ```{r contingency-table-expected, echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
 # get expected counts
+# BE note: commented out here in the R file because it's not evaluated in the 
+# R Markdown file and the purl function to convert rmd -> r converts everything 
+# with eval = FALSE into comments 
 expected_matrix <- chisq_result$expected
 
 expected_df <- as.data.frame.matrix(expected_matrix)
@@ -2220,7 +2225,7 @@ been simply to update the ticker symbol and render a new R Markdown document for
 each index. While this would work in principle, it is not fully satisfactory:
 the document takes time to render (particularly with 50,000-repetition bootstrap
 simulations) and each iteration would require manual narrative adjustments. To
-address this, we developed an interactive R Shiny dashboard, hosted via
+address this, we developed an interactive R Shiny dashboard, hosted on
 https://www.shinyapps.io/, which provides a dynamic interface for rapid
 comparative analysis. The dashboard is available via:
 
@@ -2230,33 +2235,35 @@ Figure \@ref(fig:appendixdashboard1) shows the dashboard start page. Clicking
 Run Analysis loads information for the entered Yahoo Finance ticker (with the
 default set to `^IXIC`).
 
-```{r appendixdashboard1, echo=FALSE, out.width="70%", fig.cap="The R Shiny dashboard start page. Clicking ‘Run Analysis’ will load information for the entered Yahoo Finance ticker."}
+```{r appendixdashboard1, echo=FALSE, purl=FALSE, out.width="70%", fig.cap="The R Shiny dashboard start page. Clicking ‘Run Analysis’ will load information for the entered Yahoo Finance ticker."}
 knitr::include_graphics("fig/appendix-dashboard-1.pdf")
 ```
 
 
 
-```{r appendixdashboard2, echo=FALSE, out.width="100%", fig.cap="Annotated interface of the R Shiny dashboard, highlighting key features such as flexible evaluation windows, the ability to exclude a specific outlier region, and view various elements of the project shown in different tabs. These elements are numbered here and described in the text."}
+```{r appendixdashboard2, echo=FALSE, purl=FALSE, out.width="100%", fig.cap="Annotated interface of the R Shiny dashboard, highlighting key features such as flexible evaluation windows, the ability to exclude a specific outlier region, and view various elements of the project shown in different tabs. These elements are numbered here and described in the text."}
 knitr::include_graphics("fig/appendix-dashboard-2.pdf")
 ```
 
 Figure \@ref(fig:appendixdashboard2) presents an annotated view of the user
 interface.  The dashboard includes (1) a Ticker Selection field that accepts
 standard Yahoo Finance symbols; (2–4) Data Cleaning controls, where users can
-define the study range and mask a specific outlier period (for example,
-2020-02-24 to 2020-03-23 in the case of our report); (5) Bootstrap Settings,
-allowing users to choose the number of repetitions—while 50,000 repetitions (as
-used in the report) provide high precision, lower values can be selected to
-reduce computation time; and (6) Analysis Tabs, which display the cleaned data,
+define the study range and mask a specific outlier period (2020-02-24 to 2020-03-23 in the case of our report); (5) Bootstrap Settings,
+allowing users to choose the number of repetitions (to balance accuracy and 
+computation time); and (6) Analysis Tabs, which display the cleaned data,
 normality tests, and independence diagnostics.
 
 Future development may include support for multiple exclusion windows and
 optimisation of the bootstrapping algorithm, which is currently
-resource-intensive for large numbers of repetitions.  Additionally, while the
-present implementation mirrors the project’s core analysis, there is scope to
-extend this to incorporate additional methods—for example, assessing normality
-using bootstrapped kurtosis estimates or adding functionality to vary the m
-value in the m-out-of-n bootstrap (currently hard coded as m=13).
+resource-intensive for large numbers of repetitions. While the present
+implementation mirrors the project’s core analysis, there is also scope to
+extend this to incorporate additional methods, such as assessing normality using
+bootstrapped kurtosis estimates and adding functionality to vary the m value in
+the m-out-of-n bootstrap (currently hard coded as m=13). In addition to the
+adjusted closing price used in this project, future enhancements could also
+allow users to select alternative price series (for example, open, close, or
+intraday mid prices) and different aggregation frequencies (for example, daily
+or weekly) within the app.
 
 
 ```{=latex}
@@ -2323,7 +2330,7 @@ Using the full history of the Nasdaq Composite (1971–2024), the annualised
 20-day rolling volatility was calculated to benchmark the 2018–2024 study period
 against historical extremes (Figure \@ref(fig:nasdaqAllTimeVol)).
 
-```{r nasdaqAllTimeVol, eval = TRUE, echo = FALSE, fig.height=4.4, fig.pos='!ht', fig.cap="Nasdaq Composite index price volatility from 1971-2024. The dotted line shows the volatility threshold applied to identify outliers and the red shaded region indicates the excluded window in 2018-2024 associated with the COVID-19 pandemic. Note that the volatility metric peaks after the excluded region due to the lag inherent in a trailing 20-day calculation."}
+```{r nasdaqAllTimeVol, eval = TRUE, echo = FALSE, fig.height=4.8, fig.pos='!ht', fig.cap="Nasdaq Composite index price volatility from 1971-2024. The dotted line shows the volatility threshold applied to identify outliers and the red shaded region indicates the excluded window in 2018-2024 associated with the COVID-19 pandemic. Note that the volatility metric peaks after the excluded region due to the lag inherent in a trailing 20-day calculation."}
 #----------- Appendix Figure: full nasdaq rolling 20day volatility ------------#
 appendix_p1 <- ggplot(nasdaq_data_full, aes(x = date)) +
   geom_line(aes(y = volitility_20d, color = "20-Day"), size = 0.3) +
