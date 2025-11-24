@@ -20,6 +20,8 @@
 *.css
 *.xlsx
 *.doc*
+*.ppt*
+*.dfc*
 
 # files
 cs1-group07.fdb_latexmk

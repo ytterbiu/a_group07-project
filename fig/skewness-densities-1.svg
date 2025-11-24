@@ -100,11 +100,11 @@
 <rect x='321.79' y='148.89' width='15.86' height='15.86' style='stroke-width: 1.07; stroke-linecap: butt; fill: #00BFC4; fill-opacity: 0.40;' />
 <text x='343.84' y='142.69' style='font-size: 8.80px; font-family: "Arial";' textLength='77.20px' lengthAdjust='spacingAndGlyphs'>Bootstrap from data</text>
 <text x='343.84' y='159.97' style='font-size: 8.80px; font-family: "Arial";' textLength='54.73px' lengthAdjust='spacingAndGlyphs'>Normal model</text>
-<text x='35.56' y='17.68' style='font-size: 13.20px; font-family: "Arial";' textLength='147.27px' lengthAdjust='spacingAndGlyphs'>Sampling distributions of </text>
-<text x='183.22' y='17.68' style='font-size: 13.20px; font-family: "Symbol";' textLength='5.42px' lengthAdjust='spacingAndGlyphs'>γ</text>
-<text x='182.83' y='15.08' style='font-size: 13.20px; font-family: "Arial";' textLength='6.19px' lengthAdjust='spacingAndGlyphs'>^</text>
-<text x='189.02' y='21.01' style='font-size: 9.24px; font-family: "Arial";' textLength='5.14px' lengthAdjust='spacingAndGlyphs'>1</text>
-<text x='194.16' y='17.68' style='font-size: 13.20px; font-family: "Arial";' textLength='59.69px' lengthAdjust='spacingAndGlyphs'> for n = 13</text>
+<text x='60.96' y='17.68' style='font-size: 13.20px; font-family: "Arial";' textLength='147.27px' lengthAdjust='spacingAndGlyphs'>Sampling distributions of </text>
+<text x='208.61' y='17.68' style='font-size: 13.20px; font-family: "Symbol";' textLength='5.42px' lengthAdjust='spacingAndGlyphs'>γ</text>
+<text x='208.23' y='15.08' style='font-size: 13.20px; font-family: "Arial";' textLength='6.19px' lengthAdjust='spacingAndGlyphs'>^</text>
+<text x='214.42' y='21.01' style='font-size: 9.24px; font-family: "Arial";' textLength='5.14px' lengthAdjust='spacingAndGlyphs'>1</text>
+<text x='219.56' y='17.68' style='font-size: 13.20px; font-family: "Arial";' textLength='59.69px' lengthAdjust='spacingAndGlyphs'> for n = 13</text>
 </g>
 </g>
 </svg>

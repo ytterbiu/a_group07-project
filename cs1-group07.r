@@ -28,6 +28,7 @@
 #   - nortest
 #   - boot
 #   - clipr
+#   - htmltools (only if knitting the rmd file to html)
 # ==============================================================================
 
 
@@ -36,13 +37,13 @@ dir.create("fig", showWarnings = FALSE)
 
 # Defaults common to all outputs
 knitr::opts_chunk$set(
-  echo     = TRUE,
-  message  = FALSE,
-  warning  = FALSE,
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
   fig.align = "center",
   out.width = "100%",
-  fig.path  = "fig/",
-  dpi       = 300
+  fig.path = "fig/",
+  dpi = 300
 )
 
 # Output-specific settings
@@ -58,7 +59,7 @@ if (knitr::is_latex_output()) {
   knitr::opts_chunk$set(
     fig.width = 6,
     fig.height = 4,
-    dev = "svglite"  # or "png"
+    dev = "svglite" # or "png"
   )
 }
 
@@ -87,6 +88,8 @@ library(boot) # bootstrapping
 # for custom functions
 library(clipr) # for banner_comment function qol to annotate code
 
+
+
 #---------------------------- Custom QOL functions ----------------------------#
 #####################################
 # function: banner comments (used to to section up code)
@@ -96,14 +99,14 @@ banner_comment <- function(text, width = 80, border = "#", fill = "-") {
   txt <- paste0(" ", text, " ")
   inner_width <- width - 2 * nchar(border)
   banner_string <- ""
-  
+
   if (inner_width <= nchar(txt)) {
     banner_string <- paste0(border, txt, border)
   } else {
     pad_total <- inner_width - nchar(txt)
     pad_left <- pad_total %/% 2
     pad_right <- pad_total - pad_left
-    
+
     banner_string <- paste0(
       border,
       strrep(fill, pad_left),
@@ -112,7 +115,7 @@ banner_comment <- function(text, width = 80, border = "#", fill = "-") {
       border
     )
   }
-  
+
   cat(banner_string, "\n")
   # copy banner to allow direct pasting (requires clipr)
   clipr::write_clip(banner_string)
@@ -120,7 +123,7 @@ banner_comment <- function(text, width = 80, border = "#", fill = "-") {
   invisible(banner_string)
 }
 #####################################
-# function: format p-values for text 
+# function: format p-values for text
 # Usage (in-line): `r format_p_vals(ad_test_result$p.value)`
 # Usage (console): format_p_vals(ad_test_result$p.value)
 #####################################
@@ -144,15 +147,17 @@ format_p_vals <- function(p) {
   }
 }
 #####################################
-# function: format confidence intervals for tables & text 
+# function: format confidence intervals for tables & text
 # Usage (in-line): `r format_interval(el2_ci_normal_95[1], el2_ci_normal_95[2])`
 # Usage (console): format_interval(el2_ci_normal_95[1], el2_ci_normal_95[2])
 #####################################
-format_interval <- function(lower, upper, digits=3) {
-  paste0("[", 
-       formatC(lower, format = "f", digits = digits), ", ",
-       formatC(upper, format = "f", digits = digits), 
-       "]")
+format_interval <- function(lower, upper, digits = 3) {
+  paste0(
+    "[",
+    formatC(lower, format = "f", digits = digits), ", ",
+    formatC(upper, format = "f", digits = digits),
+    "]"
+  )
 }
 
 #---------------------------- Download / Load data ----------------------------#
@@ -160,17 +165,17 @@ format_interval <- function(lower, upper, digits=3) {
 # December 2024 were extracted using `getSymbols` from the `quantmod` package.
 # These data were then used as the basis for our statistical evaluation in this
 # report.
-# 
+#
 # Update 2025-11-21: included download for full IXIC data (used in appendix)
 #
 # Define inputs & date range
 ticker <- "^IXIC"
 study_from <- as.Date("2018-01-01")
-study_to   <- as.Date("2024-12-31")
+study_to <- as.Date("2024-12-31")
 
 # All data (for appendix etc.)
-full_from  <- as.Date("1971-01-01")
-full_to    <- study_to
+full_from <- as.Date("1971-01-01")
+full_to <- study_to
 
 # Clean ticker for filename (remove ^ and any non-alphanumerics)
 ticker_clean <- gsub("[^A-Za-z0-9]", "", ticker)
@@ -181,7 +186,7 @@ make_fname <- function(prefix, from, to) {
     ticker_clean,
     prefix,
     format(from, "%Y%m%d"),
-    format(to,   "%Y%m%d")
+    format(to, "%Y%m%d")
   )
 }
 
@@ -237,7 +242,7 @@ load_or_download_xts <- function(ticker, from, to, cache_file) {
 
 # get full ixic data (1971-01-01 -> 2024-12-31)
 fname_full <- make_fname("full", full_from, full_to)
-IXIC_full  <- load_or_download_xts(ticker, full_from, full_to, fname_full)
+IXIC_full <- load_or_download_xts(ticker, full_from, full_to, fname_full)
 
 # get subset for our date range (2018-01-01 -> 2024-12-31)
 IXIC <- IXIC_full[paste0(study_from, "/", study_to)]
@@ -262,13 +267,13 @@ z_n <- na.omit(z_n)
 #   increments. This means the movement in the next millisecond is completely
 #   mathematically independent of the movement in the previous millisecond. Eq1
 #   is the discrete-time snapshot of the continuous Wiener process Hull
-#   describes. Because the underlying dz has "hard-coded" independence, the 
-#   daily returns inherit the assumption 
+#   describes. Because the underlying dz has "hard-coded" independence, the
+#   daily returns inherit the assumption
 #   or tldr; -> whole model is built on Brownian motion.
-#   
+#
 #   BE note to self 2: Geometric Brownian Motion assumes returns are independant
-#   Sec 14.8 in Hull looks at Fractional Brownian motion which is different 
-#   ('non markov') which I think means it is dependent (idea that the market 
+#   Sec 14.8 in Hull looks at Fractional Brownian motion which is different
+#   ('non markov') which I think means it is dependent (idea that the market
 #   has 'memory' whereas a markov frame of reference is that future price only
 #   depends on current price, not path taken to get there*)
 #   - Something to check during office hours (don't fully understand)
@@ -276,16 +281,16 @@ z_n <- na.omit(z_n)
 
 # # BE note: set eval to false on 19/11/2025 following group meeting
 # # same length as IXIC_ad, first value NA
-# 
+#
 # df_initial_ixic <- tibble(
 #   date = index(IXIC_ad),
 #   price = as.numeric(IXIC_ad),
 #   z_n = as.numeric(z_n)
 # ) %>%
 #   drop_na(z_n)
-# 
+#
 # date_range <- range(df_initial_ixic$date, na.rm = TRUE)
-# 
+#
 # p1_initial_vis <- ggplot(df_initial_ixic, aes(date, price)) +
 #   theme_bw() +
 #   geom_line(linewidth = 0.5) +
@@ -294,7 +299,7 @@ z_n <- na.omit(z_n)
 #     x = "Date",
 #     y = "Adjusted Close ($)"
 #   )
-# 
+#
 # p2_initial_vis <- ggplot(df_initial_ixic, aes(date, z_n)) +
 #   geom_line(linewidth = 0.5) +
 #   theme_bw() +
@@ -303,7 +308,7 @@ z_n <- na.omit(z_n)
 #     x = "Date",
 #     y = expression(z[n])
 #   )
-# 
+#
 # # gridExtra::grid.arrange(p1, p2, ncol = 2)
 # (p1_initial_vis | p2_initial_vis) &
 #   theme(
@@ -312,7 +317,7 @@ z_n <- na.omit(z_n)
 #   )
 
 # trading_period_days <- 60
-# 
+#
 # # rolling mean return
 # el1_rolling_return <- rollapply(
 #   z_n,
@@ -321,7 +326,7 @@ z_n <- na.omit(z_n)
 #   align = "right",
 #   fill  = NA
 # ) #* 252
-# 
+#
 # # rolling volatility
 # el1_rolling_volatility <- rollapply(
 #   z_n,
@@ -330,15 +335,15 @@ z_n <- na.omit(z_n)
 #   align = "right",
 #   fill  = NA
 # ) #* sqrt(252)
-# 
+#
 # # combine into one xts and give sensible names
 # el1_xts <- merge(el1_rolling_return, el1_rolling_volatility)
 # colnames(el1_xts) <- c("rolling_return", "rolling_volatility")
-# 
+#
 # # convert xts → data frame with explicit date column
 # el1_df <- fortify.zoo(el1_xts, name = "date")
 # # columns are now: date, rolling_return, rolling_volatility
-# 
+#
 # # plot: 60-day annualised rolling mean log-return
 # p1_rr <- ggplot(el1_df, aes(x = date, y = rolling_return)) +
 #   geom_line(linewidth = 0.5) +
@@ -348,7 +353,7 @@ z_n <- na.omit(z_n)
 #     x = "Date",
 #     y = expression(Annualised ~ mean ~ log ~ return)
 #   )
-# 
+#
 # # plot: 60-day rolling volatility
 # p2_vol <- ggplot(el1_df, aes(x = date, y = rolling_volatility)) +
 #   geom_line(linewidth = 0.5) +
@@ -358,7 +363,7 @@ z_n <- na.omit(z_n)
 #     x = "Date",
 #     y = expression(Annualised ~ volatility)
 #   )
-# 
+#
 # # combine with patchwork
 # (p1_rr | p2_vol) &
 #   theme(
@@ -400,28 +405,28 @@ z_n_clean <- na.omit(z_n_clean)
 #     mid   = start + floor(as.numeric(end - start) / 2),
 #     label = as.character(id)
 #   )
-# 
+#
 # df <- tibble(
 #   date  = index(IXIC_ad),
 #   price = as.numeric(IXIC_ad),
 #   z_n   = as.numeric(z_n)
 # ) %>%
 #   drop_na(z_n)
-# 
+#
 # range_p1 <- range(df$price, na.rm = TRUE)
 # range_p2 <- range(df$z_n,   na.rm = TRUE)
-# 
+#
 # label_y_p1 <- range_p1[2] - 0.08 * diff(range_p1)
 # label_y_p2 <- range_p2[2] - 0.02 * diff(range_p2)
 # # label_y_p1 <- label_y_p1*1.02
 # # label_y_p2 <- label_y_p2*1.2
-# 
+#
 # base_theme <- theme_bw() +
 #   theme(
 #     plot.title  = element_text(hjust = 0.5),
 #     plot.margin = margin(5.5, 5.5, 5.5, 5.5)
 #   )
-# 
+#
 # p1 <- ggplot(df, aes(date, price)) +
 #   geom_line() +
 #   labs(
@@ -460,7 +465,7 @@ z_n_clean <- na.omit(z_n_clean)
 #     size = 3
 #   ) #+
 #   #scale_y_continuous(expand = expansion(mult = c(0.02, 0.02)))
-# 
+#
 # p2 <- ggplot(df, aes(date, z_n)) +
 #   geom_line() +
 #   labs(
@@ -497,7 +502,7 @@ z_n_clean <- na.omit(z_n_clean)
 #   #   size = 3
 #   # ) #+
 #   #scale_y_continuous(expand = expansion(mult = c(0.02, 0.02)))
-# 
+#
 # (p1 / p2)
 
 # # We can plot a quick visualisation to compare pre & post outlier removal:
@@ -510,8 +515,8 @@ z_n_clean <- na.omit(z_n_clean)
 #   z_n  = as.numeric(z_n_clean_pre_na_drop)
 # )
 # ylim_all <- range(df_raw$z_n, df_clean$z_n, na.rm = TRUE)
-# 
-# 
+#
+#
 # p_raw <- ggplot(df_raw, aes(date, z_n)) +
 #   geom_line() +
 #   theme_bw() +
@@ -521,7 +526,7 @@ z_n_clean <- na.omit(z_n_clean)
 #     x = "Date",
 #     y = expression(z[n])
 #   )
-# 
+#
 # p_clean <- ggplot(df_clean, aes(date, z_n)) +
 #   geom_line() +
 #   theme_bw() +
@@ -531,13 +536,13 @@ z_n_clean <- na.omit(z_n_clean)
 #     x = "Date",
 #     y = expression(z[n])
 #   )
-# 
+#
 # (p_raw | p_clean) &
 #   theme(
 #     plot.title = element_text(hjust = 0.5),
 #     plot.margin = margin(5.5, 5.5, 5.5, 5.5)
 #   )
-# 
+#
 
 #----------------------------- Element 1 - Table ------------------------------#
 # Skewness and excess kurtosis of the cleaned log-returns $z_n$ were computed
@@ -620,8 +625,8 @@ kable(
   desc_z_n_clean,
   # caption = "Descriptive statistics of cleaned log returns ($z_n$).",
   caption = paste0(
-    "Descriptive statistics of cleaned Nasdaq log-returns (n = ", 
-    format(length(z_n_clean), big.mark = ","), 
+    "Descriptive statistics of cleaned Nasdaq log-returns (n = ",
+    format(length(z_n_clean), big.mark = ","),
     "). Skewness and kurtosis were calculated using Type 1 estimators. Given the large sample size, differences compared to bias-corrected (Type 2 or 3) estimators are negligible."
   ),
   booktabs = TRUE,
@@ -629,10 +634,10 @@ kable(
   escape = FALSE
 ) |>
   kable_styling(
-      full_width = FALSE, 
-      position = "center", 
-      latex_options = "hold_position"
-    )
+    full_width = FALSE,
+    position = "center",
+    latex_options = "hold_position"
+  )
 
 knitr::include_graphics("fig/timeline2.pdf")
 
@@ -646,9 +651,9 @@ el1_rolling_sd <- rollapply(
   FUN   = sd,
   align = "right",
   fill  = NA
-) # * sqrt(252) 
+) # * sqrt(252)
 # BE note: have not converted to annualised here - saving for section 3/4
-# It's challenging to convey this within the text limits for element 1.  Opted 
+# It's challenging to convey this within the text limits for element 1.  Opted
 # to introduce later mathematically where we have a bit more space
 
 # periods to remove
@@ -666,15 +671,15 @@ outlier_df <- tibble(
 # outliner dotted lines for all plots
 outlier_lines <- list(
   geom_vline(
-    data = outlier_df, 
-    aes(xintercept = start), 
-    linetype = "dotted", 
+    data = outlier_df,
+    aes(xintercept = start),
+    linetype = "dotted",
     color = "red" # Added color here
   ),
   geom_vline(
-    data = outlier_df, 
-    aes(xintercept = end), 
-    linetype = "dotted", 
+    data = outlier_df,
+    aes(xintercept = end),
+    linetype = "dotted",
     color = "red" # Added color here
   )
 )
@@ -682,8 +687,8 @@ outlier_lines <- list(
 outlier_shading <- geom_rect(
   data = outlier_df,
   aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf),
-  fill = "red", 
-  alpha = 0.2,       # Makes it transparent
+  fill = "red",
+  alpha = 0.2, # Makes it transparent
   inherit.aes = FALSE # Prevents conflicts with main plot aesthetics
 )
 
@@ -696,7 +701,7 @@ all_xts <- merge(
   z_n,
   el1_rolling_sd
 )
-  # join = "inner"
+# join = "inner"
 
 colnames(all_xts) <- c("price", "z_n", "rolling_sd")
 
@@ -709,7 +714,7 @@ df <- tibble(
 )
 
 range_p1 <- range(df$price, na.rm = TRUE)
-range_p2 <- range(df$z_n,   na.rm = TRUE)
+range_p2 <- range(df$z_n, na.rm = TRUE)
 
 label_y_p1 <- range_p1[2] - 0.08 * diff(range_p1)
 label_y_p2 <- range_p2[2] - 0.02 * diff(range_p2)
@@ -735,9 +740,9 @@ initial_vis_p1 <- ggplot(df, aes(date, price)) +
     aes(x = mid, y = label_y_p1),
     inherit.aes = FALSE,
     shape = 21,
-    fill  = "white",
+    fill = "white",
     color = "black",
-    size  = 6,
+    size = 6,
     stroke = 0.6
   ) +
   geom_text(
@@ -764,12 +769,12 @@ initial_vis_p3 <- ggplot(df, aes(date, rolling_sd)) +
   geom_line(na.rm = TRUE) +
   labs(
     title = paste0(
-      "Nasdaq Composite Volatility (", 
-      trading_period_days, 
+      "Nasdaq Composite Volatility (",
+      trading_period_days,
       "-day rolling window)"
-      ),
+    ),
     x = NULL,
-    y = bquote( s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+    y = bquote(s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   base_theme +
   outlier_shading
@@ -789,7 +794,7 @@ df_clean <- df %>%
 ylim_all <- range(df$z_n, df_clean$z_n, na.rm = TRUE)
 
 initial_vis_p4 <- ggplot(df_clean, aes(date, z_n)) +
-  geom_line() +                 
+  geom_line() +
   base_theme +
   scale_y_continuous(limits = ylim_all) +
   labs(
@@ -814,13 +819,13 @@ N_reps <- 50000
 n_sample_size <- 13
 
 # Simulate 50,000 skewness values using sample size of 13
-#   Generate 13 values normally distributed with (z_mean, z_sd) 
+#   Generate 13 values normally distributed with (z_mean, z_sd)
 #   Calculate skewness of these 13 values
 #   Repeat process 50,000 times
 #   Tells one how much noise one would expect given this small sample size (13)
 skew_normal_sim <- replicate(
   N_reps, e1071::skewness(rnorm(n_sample_size, z_mean, z_sd), type = 1)
-  )
+)
 
 # bootstrapping skewness simulation
 #   Pick 13 values from z_n_clean (with replacement)
@@ -829,11 +834,11 @@ skew_normal_sim <- replicate(
 #   Looking at skewness if we just take 13 random days of data
 skew_bootstrap <- replicate(
   N_reps, e1071::skewness(sample(z_n_clean, n_sample_size, replace = TRUE), type = 1)
-  )
+)
 
 #------------ basic
 skew_normal_sim_median <- median(skew_normal_sim)
-skew_normal_bootstrap  <- median(skew_bootstrap)
+skew_normal_bootstrap <- median(skew_bootstrap)
 sd_normal_sim <- sd(skew_normal_sim)
 sd_normal_boo <- sd(skew_bootstrap)
 el2_original_skew <- e1071::skewness(z_n_clean, type = 1)
@@ -843,7 +848,7 @@ el2_bias <- mean(skew_bootstrap) - el2_original_skew
 # calculating quantile based confidence interval
 ci_95_skew_zn_boot_quantile <- quantile(skew_bootstrap, probs = c(0.025, 0.975))
 ci_95_skew_normals_quantile <- quantile(skew_normal_sim, probs = c(0.025, 0.975))
-# 
+#
 # print(ci_95_skew_zn_boot_quantile)
 # print(ci_95_skew_normals_quantile)
 
@@ -853,55 +858,59 @@ ci_95_skew_normals_quantile <- quantile(skew_normal_sim, probs = c(0.025, 0.975)
 # Takes a vector of observations x, the number of bootstrap samples to take,
 # an estimator plus additional parameters for it, and confidence levels for
 # the output intervals
-"bcanon" <- function(x,nboot,theta,...,alpha =
-                     c(.025,.05,.1,.16,.84,.9,.95,.975)) {
-    if (!all(alpha < 1) || !all(alpha > 0))
-      stop("All elements of alpha must be in (0,1)")
+"bcanon" <- function(x, nboot, theta, ..., alpha =
+                       c(.025, .05, .1, .16, .84, .9, .95, .975)) {
+  if (!all(alpha < 1) || !all(alpha > 0)) {
+    stop("All elements of alpha must be in (0,1)")
+  }
 
-    # NB. these lines check that nboot > (1 / alpha) and because otherwise
-    # you need more samples to get a somewhat useful confidence interval.
-    alpha_sorted <- sort(alpha)
-    if (nboot <= 1/min(alpha_sorted[1],1-alpha_sorted[length(alpha_sorted)]))
-      warning("nboot is not large enough to estimate your chosen alpha.")
+  # NB. these lines check that nboot > (1 / alpha) and because otherwise
+  # you need more samples to get a somewhat useful confidence interval.
+  alpha_sorted <- sort(alpha)
+  if (nboot <= 1 / min(alpha_sorted[1], 1 - alpha_sorted[length(alpha_sorted)])) {
+    warning("nboot is not large enough to estimate your chosen alpha.")
+  }
 
-    # unrelated to the actual bootstrapping
-    call <- match.call()
+  # unrelated to the actual bootstrapping
+  call <- match.call()
 
-    # compute theta(x) of the samples and resample the data nboot times
-    n <- length(x)
-    thetahat <- theta(x,...)
-    bootsam<- matrix(sample(x,size=n*nboot,replace=TRUE),nrow=nboot)
+  # compute theta(x) of the samples and resample the data nboot times
+  n <- length(x)
+  thetahat <- theta(x, ...)
+  bootsam <- matrix(sample(x, size = n * nboot, replace = TRUE), nrow = nboot)
 
-    # compute theta for each sample and compute the quartile of the fraction
-    # below our original estimate under a normal distribution
-    thetastar <- apply(bootsam,1,theta,...)
-    z0 <- qnorm(sum(thetastar<thetahat)/nboot)
+  # compute theta for each sample and compute the quartile of the fraction
+  # below our original estimate under a normal distribution
+  thetastar <- apply(bootsam, 1, theta, ...)
+  z0 <- qnorm(sum(thetastar < thetahat) / nboot)
 
-    # get a jackknife estimate for theta to compute the acceleration factor
-    u <- rep(0,n)
-    for(i in 1:n){
-        u[i] <- theta(x[-i],...)
-    }
-    uu <- mean(u)-u
-    acc <- sum(uu*uu*uu)/(6*(sum(uu*uu))^1.5)
+  # get a jackknife estimate for theta to compute the acceleration factor
+  u <- rep(0, n)
+  for (i in 1:n) {
+    u[i] <- theta(x[-i], ...)
+  }
+  uu <- mean(u) - u
+  acc <- sum(uu * uu * uu) / (6 * (sum(uu * uu))^1.5)
 
-    # compute the actual distribution that we are taking the quantiles of to
-    # create the confidence interval
-    zalpha <- qnorm(alpha)
+  # compute the actual distribution that we are taking the quantiles of to
+  # create the confidence interval
+  zalpha <- qnorm(alpha)
 
-    tt <- pnorm(z0+ (z0+zalpha)/(1-acc*(z0+zalpha)))
+  tt <- pnorm(z0 + (z0 + zalpha) / (1 - acc * (z0 + zalpha)))
 
-    confpoints <- quantile(x=thetastar,probs=tt,type=1)
+  confpoints <- quantile(x = thetastar, probs = tt, type = 1)
 
-    # and now just some logic for outputting it
-    names(confpoints) <- NULL
-    confpoints <- cbind(alpha,confpoints)
-    dimnames(confpoints)[[2]] <- c("alpha","bca point")
-    return(list(confpoints=confpoints,
-                z0=z0,
-                acc=acc,
-                u=u,
-                call=call))
+  # and now just some logic for outputting it
+  names(confpoints) <- NULL
+  confpoints <- cbind(alpha, confpoints)
+  dimnames(confpoints)[[2]] <- c("alpha", "bca point")
+  return(list(
+    confpoints = confpoints,
+    z0 = z0,
+    acc = acc,
+    u = u,
+    call = call
+  ))
 }
 
 
@@ -913,11 +922,11 @@ ci_95_skew_normals_quantile <- quantile(skew_normal_sim, probs = c(0.025, 0.975)
 #   theta = e1071::skewness,
 #   type  = 1
 # )
-# 
+#
 # # calculating quantile based confidence interval
 # print(ci_95_skew_zn_boot_quantile)
 # print(ci_95_skew_normals_quantile)
-# 
+#
 # alpha and corresponding BCa points
 # print(bca_skew$confpoints)
 
@@ -964,13 +973,13 @@ ci_table <- data.frame(
   ),
   Lower = c(
     el2_ci_normal_95[1],
-    el2_ci_boot_95[1],        
+    el2_ci_boot_95[1],
     el2_ci_boot_full_perc[1],
     el2_ci_boot_full_bca[1]
   ),
   Upper = c(
     el2_ci_normal_95[2],
-    el2_ci_boot_95[2],        
+    el2_ci_boot_95[2],
     el2_ci_boot_full_perc[2],
     el2_ci_boot_full_bca[2]
   )
@@ -991,10 +1000,10 @@ ci_table_2 <- data.frame(
     "Bootstrap BCa"
   ),
   N = c(
-    n_sample_size,        
-    n_sample_size,        
-    length(z_n_clean),    
-    length(z_n_clean)     
+    n_sample_size,
+    n_sample_size,
+    length(z_n_clean),
+    length(z_n_clean)
   ),
   `95 percent CI` = c(
     format_interval(el2_ci_normal_95[1], el2_ci_normal_95[2], ci_table_2_digits),
@@ -1009,9 +1018,10 @@ ci_table_2 <- data.frame(
 # bootstrapping skewness simulation
 skew_df <- data.frame(
   skewness = c(skew_normal_sim, skew_bootstrap),
-  Source   = factor(
+  Source = factor(
     rep(c("Normal model", "Bootstrap from data"),
-        each = N_reps)
+      each = N_reps
+    )
   )
 )
 
@@ -1021,9 +1031,9 @@ ggplot(skew_df, aes(x = skewness, fill = Source)) +
   theme(plot.title = element_text(hjust = 0.5)) +
   labs(
     title = expression("Sampling distributions of " * hat(gamma)[1] *
-                       " for n = 13"),
-    x     = expression(hat(gamma)[1]),
-    y     = "Density"
+      " for n = 13"),
+    x = expression(hat(gamma)[1]),
+    y = "Density"
   )
 
 # kable(
@@ -1050,10 +1060,10 @@ kable(
   row.names = FALSE,
 ) %>%
   kable_styling(
-    full_width = FALSE, 
+    full_width = FALSE,
     position = "center",
     latex_options = "hold_position"
-    )
+  )
 
 # ==============================================================================
 #----------------- Element 3: investigation of constant mean ------------------#
@@ -1097,19 +1107,19 @@ breaks <- seq(start0, end_next, by = "6 months")
 
 # nice labels "01 Jan 2018 - 30 Jun 2018" etc.
 start_labels <- breaks[-length(breaks)]
-end_labels   <- breaks[-1] - 1
+end_labels <- breaks[-1] - 1
 
 period_labels <- paste(
   format(start_labels, "%b %Y"),
   "-",
-  format(end_labels,   "%b %Y")
+  format(end_labels, "%b %Y")
 )
 
 # assign each observation to a 6-month bin (right-open [start, end])
 Period <- cut(
   dates,
   breaks = breaks,
-  right  = FALSE,
+  right = FALSE,
   labels = period_labels,
   include.lowest = TRUE
 )
@@ -1135,11 +1145,11 @@ period_labels <- names(days_per_period)
 
 # split into start/end strings
 start_dates <- sub(" -.*", "", period_labels)
-end_dates   <- sub(".*- ", "", period_labels)
+end_dates <- sub(".*- ", "", period_labels)
 
 days_table <- data.frame(
-  `Start date`             = start_dates,
-  `End date`               = end_dates,
+  `Start date` = start_dates,
+  `End date` = end_dates,
   `Number of data entries` = as.integer(days_per_period),
   check.names = FALSE
 )
@@ -1158,18 +1168,18 @@ kruskal_df$p.value <- formatC(kruskal_df$p.value, format = "fg", digits = 4)
 # The interpretation of the Kruskal-Wallis test depends on the homogeneity of
 # variance across groups. We test assumption of constant variance in
 # \S\@ref(elementFou) so not safe (I think) to assume it here.
-# We instead rely on the strict assumption that the distributions share 
-# identical shapes. The Kruskal-Wallis test should therefore be interpreted in 
-# its most general form 
-# -> assessing differences in mean ranks (stochastic dominance) rather than a 
+# We instead rely on the strict assumption that the distributions share
+# identical shapes. The Kruskal-Wallis test should therefore be interpreted in
+# its most general form
+# -> assessing differences in mean ranks (stochastic dominance) rather than a
 # whether the medians are equal
-# 
+#
 # Stochastic dominance:
-# If Group A stochastically dominates Group B, it implies that if you picked 
-# one random number from A and one random number from B, the number from A 
+# If Group A stochastically dominates Group B, it implies that if you picked
+# one random number from A and one random number from B, the number from A
 # is likely to be larger than B more than 50% of the time.
-# tldr; because some boxplots are fat (high variance) and some are thin, we 
-# can't just talk about the median - instead want to say something like: 
+# tldr; because some boxplots are fat (high variance) and some are thin, we
+# can't just talk about the median - instead want to say something like:
 # "This group generally tends to produce higher numbers than that group"
 
 # kable(
@@ -1203,7 +1213,7 @@ kable(
   booktabs = TRUE,
   longtable = TRUE,
   linesep = c("", "\\addlinespace"),
-  align = c("r","r", "c")
+  align = c("r", "r", "c")
 ) |>
   kable_styling(
     full_width = FALSE,
@@ -1228,12 +1238,12 @@ var_df <- data.frame(
 )
 var_df_annual <- data.frame(
   Period   = factor(names(z_list), levels = names(z_list)),
-  Variance = as.numeric(variances)*252
+  Variance = as.numeric(variances) * 252
 )
 
 # !changed to *252: extract the subsamples as numeric vectors & drop NA
-min_var_sample <- na.omit(as.numeric(z_list[[min_var_loc]]))*252
-max_var_sample <- na.omit(as.numeric(z_list[[max_var_loc]]))*252
+min_var_sample <- na.omit(as.numeric(z_list[[min_var_loc]])) * 252
+max_var_sample <- na.omit(as.numeric(z_list[[max_var_loc]])) * 252
 min_var_sample <- na.omit(as.numeric(z_list[[min_var_loc]]))
 max_var_sample <- na.omit(as.numeric(z_list[[max_var_loc]]))
 
@@ -1277,7 +1287,7 @@ var_ci_max_bca <- var_ci_max_95$bca[4:5]
 start_dates <- as.Date(sapply(z_list, function(x) index(x)[1]))
 
 # last observed date in each block
-last_dates  <- as.Date(sapply(z_list, function(x) index(x)[NROW(x)]))
+last_dates <- as.Date(sapply(z_list, function(x) index(x)[NROW(x)]))
 
 # end date of each block:
 # - for all but last: day before next block's start
@@ -1300,19 +1310,19 @@ max_period_label <- period_labels[max_var_loc]
 
 # Daily variance per period, then annualise
 variances_daily <- sapply(z_list, var, na.rm = TRUE)
-variances_ann   <- variances_daily * 252
+variances_ann <- variances_daily * 252
 
 min_var_loc <- which.min(variances_ann)
 max_var_loc <- which.max(variances_ann)
 
 # Period labels
 start_dates <- as.Date(sapply(z_list, function(x) index(x)[1]))
-last_dates  <- as.Date(sapply(z_list, function(x) index(x)[NROW(x)]))
-end_dates   <- c(start_dates[-1] - 1, last_dates[length(last_dates)])
+last_dates <- as.Date(sapply(z_list, function(x) index(x)[NROW(x)]))
+end_dates <- c(start_dates[-1] - 1, last_dates[length(last_dates)])
 
 period_labels <- paste(
   base::format(start_dates, "%b %Y"), "-",
-  base::format(end_dates,  "%b %Y")
+  base::format(end_dates, "%b %Y")
 )
 
 # min/max periods (still daily reforms)
@@ -1326,7 +1336,7 @@ var_ann_stat <- function(x, idx) var(x[idx]) * 252
 boot_min <- boot(data = min_var_sample, statistic = var_ann_stat, R = 5000)
 boot_max <- boot(data = max_var_sample, statistic = var_ann_stat, R = 5000)
 
-# BCa 95% CIs 
+# BCa 95% CIs
 ci_min_95 <- boot.ci(boot_min, type = "bca", conf = 0.95)$bca[4:5]
 ci_max_95 <- boot.ci(boot_max, type = "bca", conf = 0.95)$bca[4:5]
 
@@ -1337,17 +1347,23 @@ s2_max_ann <- var(max_var_sample) * 252
 min_period_label <- period_labels[min_var_loc]
 max_period_label <- period_labels[max_var_loc]
 
-# Bootstrapping confidence intervals for $\sigma^2$ 
+# Bootstrapping confidence intervals for $\sigma^2$
 # Create summary table
 var_ci_table <- data.frame(
   Subsample = c("Min variance", "Max variance"),
   Period = c(min_period_label, max_period_label),
-  s2        = c(var(min_var_sample),
-                var(max_var_sample)),
-  CI_lower  = c(var_ci_min_bca[1],
-                var_ci_max_bca[1]),
-  CI_upper  = c(var_ci_min_bca[2],
-                var_ci_max_bca[2])
+  s2 = c(
+    var(min_var_sample),
+    var(max_var_sample)
+  ),
+  CI_lower = c(
+    var_ci_min_bca[1],
+    var_ci_max_bca[1]
+  ),
+  CI_upper = c(
+    var_ci_min_bca[2],
+    var_ci_max_bca[2]
+  )
 )
 
 fmt <- function(x) formatC(x, format = "f", digits = 6)
@@ -1407,9 +1423,9 @@ var_ci_table_disp <- var_ci_table |>
 #   col.names = c("Subsample", "Six-month period",
 #                 "Annualised variance $s^2$ (×252)",
 #                 "95\\% CI lower", "95\\% CI upper"),
-#   booktabs = TRUE, 
+#   booktabs = TRUE,
 #   align = c("l","l","r","r","r"),
-#   escape = FALSE, 
+#   escape = FALSE,
 #   digits = 3,
 #   caption = "BCa 95\\% confidence intervals for annualised variance in the six-month periods with minimum and maximum variance."
 # ) |>
@@ -1420,7 +1436,7 @@ var_ci_table_disp <- var_ci_table |>
 
 # boxplot
 p_box_el4 <- ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
-  geom_boxplot(width = 0.75, outlier.size = 0.7, linewidth   = 0.3) +
+  geom_boxplot(width = 0.75, outlier.size = 0.7, linewidth = 0.3) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5)) +
   labs(
@@ -1434,13 +1450,13 @@ p_box_el4 <- ggplot(combined_df_el3, aes(x = Period, y = z_value)) +
     # panel.grid.minor.y = element_blank(),
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
-    axis.text.x     = element_blank(),
-    axis.ticks.x    = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
   )
 
 p_var_el4 <- ggplot(var_df_annual, aes(x = Period, y = Variance, fill = Period)) +
   # scale_fill_viridis_d() +
-  geom_col(fill = "white", colour = "black", width = 0.75, linewidth   = 0.3) +
+  geom_col(fill = "white", colour = "black", width = 0.75, linewidth = 0.3) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5)) +
   labs(
@@ -1455,7 +1471,7 @@ p_var_el4 <- ggplot(var_df_annual, aes(x = Period, y = Variance, fill = Period))
     # panel.grid.minor.y = element_blank(),
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
-    axis.text.x     = element_text(angle = 45, hjust = 1),
+    axis.text.x = element_text(angle = 45, hjust = 1),
     legend.position = "none",
   )
 
@@ -1465,18 +1481,18 @@ p_var_el4 <- ggplot(var_df_annual, aes(x = Period, y = Variance, fill = Period))
 
 final_table_df <- data.frame(
   Subsample = c("Min variance", "Max variance"),
-  Period    = c(min_period_label, max_period_label),
-  s2_ann    = c(s2_min_ann, s2_max_ann),
-  ci        = c(
-                format_interval(ci_min_95[1], ci_min_95[2], 3), 
-                format_interval(ci_max_95[1], ci_max_95[2], 3)
-                )
+  Period = c(min_period_label, max_period_label),
+  s2_ann = c(s2_min_ann, s2_max_ann),
+  ci = c(
+    format_interval(ci_min_95[1], ci_min_95[2], 3),
+    format_interval(ci_max_95[1], ci_max_95[2], 3)
+  )
 )
 
 kable(
   final_table_df,
   col.names = c(
-    "Subsample", 
+    "Subsample",
     "Six-month period",
     "Point Estimate",
     "95% CI"
@@ -1486,12 +1502,12 @@ kable(
   align = c("l", "l", "r", "c"),
   caption = "Comparison of annualised variance for the lowest and highest volatility periods. Ninety-five percent CIs were calculated using BCa bootstrapping (N=5,000)."
 ) %>%
-  add_header_above(c(" " = 2, "Annualised Variance" = 2)) %>% 
+  add_header_above(c(" " = 2, "Annualised Variance" = 2)) %>%
   kable_styling(
-      full_width = FALSE, 
-      position = "center",
-      latex_options = "hold_position"
-    )
+    full_width = FALSE,
+    position = "center",
+    latex_options = "hold_position"
+  )
 
 # ==============================================================================
 #------------------- Element 5: independence of increments --------------------#
@@ -1510,8 +1526,8 @@ colnames(z_merged) <- c("z_n", "z_n_minus_1")
 q <- quantile(z_n_clean, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
 
 # create categorical variables
-breaks  <- c(-Inf, q, Inf)
-labels  <- c("Q1", "Q2", "Q3", "Q4")
+breaks <- c(-Inf, q, Inf)
+labels <- c("Q1", "Q2", "Q3", "Q4")
 z_n_cat <- cut(z_merged$z_n, breaks = breaks, labels = labels)
 z_n_minus_1_cat <- cut(z_merged$z_n_minus_1, breaks = breaks, labels = labels)
 
@@ -1524,7 +1540,7 @@ chisq_result <- chisq.test(con_table)
 # chisq_result
 # chisq_result$expected
 
-# If any expected counts are low (R will often produce a warning), 
+# If any expected counts are low (R will often produce a warning),
 # the $\chi^2$ p-value is unreliable may then want to use Fisher's Exact Test
 if (any(chisq_result$expected < 5)) {
   fisher_result <- fisher.test(con_table)
@@ -1534,35 +1550,37 @@ if (any(chisq_result$expected < 5)) {
 # Create dataframe for the definitions
 quartile_def <- data.frame(
   Category = c("Q1", "Q2", "Q3", "Q4"),
-  Range    = c("$z_n \\le Q_1$", 
-               "$Q_1 < z_n \\le Q_2$", 
-               "$Q_2 < z_n \\le Q_3$", 
-               "$z_n > Q_3$")
+  Range = c(
+    "$z_n \\le Q_1$",
+    "$Q_1 < z_n \\le Q_2$",
+    "$Q_2 < z_n \\le Q_3$",
+    "$z_n > Q_3$"
+  )
 )
 
 kable(
   quartile_def,
   col.names = c("Category", "Mathematical Range"),
   align = c("c", "c", "l"),
-  escape = FALSE, 
+  escape = FALSE,
   booktabs = TRUE,
   caption = "Classification of log-returns into discrete categories based on sample quartiles."
 ) %>%
   kable_styling(
-    full_width = FALSE, 
+    full_width = FALSE,
     position = "center",
     latex_options = "hold_position"
-    )
+  )
 
 # # get expected counts
 # expected_matrix <- chisq_result$expected
-# 
+#
 # expected_df <- as.data.frame.matrix(expected_matrix)
 # expected_df <- tibble::tibble(
 #   `$z_{n-1}$ quartile` = rownames(expected_matrix),
 #   expected_df
 # )
-# 
+#
 # kable(
 #   expected_df,
 #   caption = "Expected cell frequencies under the null hypothesis of serial independence.",
@@ -1600,10 +1618,10 @@ kable(
     escape = FALSE
   ) |>
   kable_styling(
-    full_width = FALSE, 
+    full_width = FALSE,
     position = "center",
     latex_options = "hold_position"
-    )
+  )
 
 # ==============================================================================
 #------------------- Element 6: general upwardness of trend -------------------#
@@ -1616,8 +1634,8 @@ total_days <- length(z_n_clean)
 # 'why approximate when you can calculate' so opted for that here)
 binom_res <- binom.test(num_positive, total_days, p = 0.5, alternative = "greater")
 
-# BE note: In element 5 we showed that returns are dependent but using a 
-# Binomial we assume they are independent. 
+# BE note: In element 5 we showed that returns are dependent but using a
+# Binomial we assume they are independent.
 # The below is using the normal approximation
 # prop.test(num_positive, total_days, p = 0.5, correct = FALSE)
 # This returns a p-value of ~2.28*10^-6
@@ -1645,12 +1663,16 @@ mean_neg_run <- mean(neg_run_lengths)
 
 wilcox_res <- wilcox.test(pos_run_lengths, neg_run_lengths, alternative = "greater")
 
+knitr::include_graphics("fig/appendix-dashboard-1.pdf")
+
+knitr::include_graphics("fig/appendix-dashboard-2.pdf")
+
 # ==============================================================================
 #----------------------- Appendix: determining outliers -----------------------#
 # ==============================================================================
 
-# Concept: use full range of Nasdaq data (i.e., since the 1970s) then plot 
-# volatility and identify threshold to use to select outlier regions from our 
+# Concept: use full range of Nasdaq data (i.e., since the 1970s) then plot
+# volatility and identify threshold to use to select outlier regions from our
 # time period
 threshold_annual_volitility <- 0.70
 
@@ -1691,19 +1713,19 @@ appendix_p1 <- ggplot(nasdaq_data_full, aes(x = date)) +
   annotate(
     "text",
     x = as.Date("1975-01-01"),
-    y = threshold_annual_volitility+0.1,
+    y = threshold_annual_volitility + 0.1,
     label = paste0("Threshold (", threshold_annual_volitility, ")"),
     size = 3
   ) +
   scale_color_manual(values = c("20-Day" = "black", "60-Day" = "blue")) +
   labs(
     title = paste0(
-      "Nasdaq Composite Volatility (", 
-      trading_period_days, 
+      "Nasdaq Composite Volatility (",
+      trading_period_days,
       "-day rolling window)"
-      ),
+    ),
     x = "Date",
-    y = bquote( s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+    y = bquote(s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   # not visible when included so commented out
   # outlier_shading +
@@ -1729,12 +1751,12 @@ appendix_p2 <- ggplot(
   scale_color_manual(values = c("20-Day" = "black", "60-Day" = "blue")) +
   labs(
     title = paste0(
-      "Nasdaq Composite Volatility (", 
-      trading_period_days, 
+      "Nasdaq Composite Volatility (",
+      trading_period_days,
       "-day rolling window)"
-      ),
+    ),
     x = "Date",
-    y = bquote( s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
+    y = bquote(s[n] ~ "(" * .(trading_period_days) * "-day rolling)")
   ) +
   ylim(0.01, 0.99) +
   # theme(legend.position = "none") +
@@ -1742,9 +1764,9 @@ appendix_p2 <- ggplot(
 
 (appendix_p1 / appendix_p2) &
   theme(
-    plot.title  = element_text(hjust = 0.5),
+    plot.title = element_text(hjust = 0.5),
     plot.margin = margin(5.5, 5.5, 5.5, 5.5),
     legend.position = "none"
   )
 
-knitr::include_graphics("fig/appendix-COVID19-selection-3.pdf")
+knitr::include_graphics("fig/appendix-COVID19-selection-4.pdf")

@@ -35,16 +35,11 @@ bibliography: references.bib
 \newpage
 ```
 
-# Introduction
-
 ```{=html}
-<!-- ## Key Information
-
-### Background
+<h1>Information</h1>
 
 This R Markdown document was created as part of a group assignment for SMM047 at Bayes Business School, City St George's, University of London in Term 1 2025-26.
 
--   *BE note: use `rmarkdown::render("cs1-group07.rmd", output_format = "all")` to render this document* -->
 ```
 
 ```{r asthetic-header, include=FALSE, echo=FALSE}
@@ -78,6 +73,7 @@ This R Markdown document was created as part of a group assignment for SMM047 at
 #   - nortest
 #   - boot
 #   - clipr
+#   - htmltools (only if knitting the rmd file to html)
 # ==============================================================================
 
 ```
@@ -142,6 +138,21 @@ library(boot) # bootstrapping
 
 # for custom functions
 library(clipr) # for banner_comment function qol to annotate code
+```
+
+```{r html-app, echo=FALSE, results='asis', eval=knitr::is_html_output(), purl=FALSE}
+#------------------------------ HTML link to app ------------------------------#
+library(htmltools)
+
+div(style = "background-color: #f8f9fa; padding: 20px; border: 1px solid #e9ecef; border-radius: 5px; text-align: center; margin-bottom: 30px;",
+  h3("Bonus Interactive Dashboard Available"),
+  p("This static report is accompanied by a live R Shiny dashboard allowing one to test different tickers, exclude specific outlier periods, and adjust bootstrap simulation parameters."),
+  a(href = "https://3enji.shinyapps.io/SMM047-202526-Group07-Dashboard/", 
+    target = "_blank",
+    class = "btn btn-primary", 
+    style = "background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;",
+    "Launch Interactive Dashboard")
+)
 ```
 
 ```{r custom-functions, include=FALSE, echo=FALSE}
@@ -336,6 +347,8 @@ z_n <- na.omit(z_n)
 #   - Something to check during office hours (don't fully understand)
 
 ```
+
+# Introduction
 
 <!-- ## Background -->
 
@@ -2194,6 +2207,63 @@ more accurately reflects the empirical skewness and kurtosis.
 
 # (APPENDIX) Appendices {-} 
 
+# Bonus exploration: R Shiny dashboard {#apd-dashboard}
+
+Because there is no corner of our souls we would not turn over for extra credit,
+we conducted an additional exploration of an area for future study identified in
+the conclusion.  Rather than re-running the analyses for multiple indices, we
+developed a dashboard that allows the same workflow to be applied quickly to
+other stock market indices.
+
+As R Markdown was used to write up this project, one natural approach would have
+been simply to update the ticker symbol and render a new R Markdown document for
+each index. While this would work in principle, it is not fully satisfactory:
+the document takes time to render (particularly with 50,000-repetition bootstrap
+simulations) and each iteration would require manual narrative adjustments. To
+address this, we developed an interactive R Shiny dashboard, hosted via
+https://www.shinyapps.io/, which provides a dynamic interface for rapid
+comparative analysis. The dashboard is available via:
+
+- https://3enji.shinyapps.io/SMM047-202526-Group07-Dashboard/
+
+Figure \@ref(fig:appendixdashboard1) shows the dashboard start page. Clicking
+Run Analysis loads information for the entered Yahoo Finance ticker (with the
+default set to `^IXIC`).
+
+```{r appendixdashboard1, echo=FALSE, out.width="70%", fig.cap="The R Shiny dashboard start page. Clicking ‘Run Analysis’ will load information for the entered Yahoo Finance ticker."}
+knitr::include_graphics("fig/appendix-dashboard-1.pdf")
+```
+
+
+
+```{r appendixdashboard2, echo=FALSE, out.width="100%", fig.cap="Annotated interface of the R Shiny dashboard, highlighting key features such as flexible evaluation windows, the ability to exclude a specific outlier region, and view various elements of the project shown in different tabs. These elements are numbered here and described in the text."}
+knitr::include_graphics("fig/appendix-dashboard-2.pdf")
+```
+
+Figure \@ref(fig:appendixdashboard2) presents an annotated view of the user
+interface.  The dashboard includes (1) a Ticker Selection field that accepts
+standard Yahoo Finance symbols; (2–4) Data Cleaning controls, where users can
+define the study range and mask a specific outlier period (for example,
+2020-02-24 to 2020-03-23 in the case of our report); (5) Bootstrap Settings,
+allowing users to choose the number of repetitions—while 50,000 repetitions (as
+used in the report) provide high precision, lower values can be selected to
+reduce computation time; and (6) Analysis Tabs, which display the cleaned data,
+normality tests, and independence diagnostics.
+
+Future development may include support for multiple exclusion windows and
+optimisation of the bootstrapping algorithm, which is currently
+resource-intensive for large numbers of repetitions.  Additionally, while the
+present implementation mirrors the project’s core analysis, there is scope to
+extend this to incorporate additional methods—for example, assessing normality
+using bootstrapped kurtosis estimates or adding functionality to vary the m
+value in the m-out-of-n bootstrap (currently hard coded as m=13).
+
+
+```{=latex}
+\clearpage
+\newpage
+```
+
 # Supplemental methodology {#apd-supplementary-methods}
 
 ## Data cleaning & outlier selection {#apd-outlier-selection}
@@ -2323,7 +2393,7 @@ A threshold of 0.70 (70% annualised volatility) was selected. Note that
 annualised volatility can exceed 100%. This metric represents the standard
 deviation of daily log-returns scaled to an annual timeframe 
 $$
-\hat{\sigma}_{ann} = \hat{\sigma}_{daily} \times \sqrt{252}
+s_{ann} = s_{daily} \times \sqrt{252}
 $$
 As shown in Figure \@ref(fig:nasdaqAllTimeVol), breaches of the 0.70 level
 isolate only five distinct 'systemic shock' events over the last 50 years:
@@ -2373,7 +2443,7 @@ The dates from 2018-2024 excluded for the analysis in this report were
 24 February 2020 to 23 March 2020.
 
 ```{r bloomberg-trends, echo=FALSE, out.width="100%", fig.cap="Technical trend analysis of the Nasdaq Composite index via the Bloomberg Terminal interface (Jul 2019–Aug 2021). The exclusion window is bounded by two structural breaks, the violation of the pre-pandemic uptrend (LU1) at Point A (Feb 24, 2020) and the conclusion of the panic-selling downtrend (LD1) at Point B (Mar 23, 2020), after which a recovery trend (LU2) is established."}
-knitr::include_graphics("fig/appendix-COVID19-selection-3.pdf")
+knitr::include_graphics("fig/appendix-COVID19-selection-4.pdf")
 ```
 
 <!-- tools::showNonASCIIfile("your_file.Rmd") -->
@@ -2436,6 +2506,14 @@ the same repository
 this commit history reflects updates made to the project repository and is not
 a comprehensive timeline of all contributions by group members.
 
+A bonus interactive dashboard is available via:
+
+- https://3enji.shinyapps.io/SMM047-202526-Group07-Dashboard/
+
+The source code for this dashboard is available via the project repository: 
+
+- https://github.com/ytterbiu/a_group07-project/tree/main/dashboard
+
 ## Generative AI Declaration
 
 Generative AI (GenAI) tools were used throughout this project to assist with
@@ -2490,6 +2568,7 @@ output:
 
 All AI suggestions were critically reviewed and debated by the group before 
 implementation. For example:
+
 - While the AI suggested code for complex layouts, the specific aesthetic choices and annotations were manually adjusted to ensure clarity.
 - Where the AI proposed specific interpretations, these were cross-referenced with academic literature and statistics textbooks.
 - The final R code for implementation was written and debugged by the group with AI snippets being treated as drafts rather than final solutions.

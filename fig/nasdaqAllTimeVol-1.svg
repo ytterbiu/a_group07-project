@@ -92,12 +92,12 @@
 <text x='246.28' y='138.14' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='19.56px' lengthAdjust='spacingAndGlyphs'>2000</text>
 <text x='372.56' y='138.14' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='19.56px' lengthAdjust='spacingAndGlyphs'>2020</text>
 <text x='234.71' y='150.60' text-anchor='middle' style='font-size: 11.00px; font-family: "Arial";' textLength='23.25px' lengthAdjust='spacingAndGlyphs'>Date</text>
-<text transform='translate(18.97,121.30) rotate(-90)' style='font-size: 11.00px; font-family: "Symbol";' textLength='6.64px' lengthAdjust='spacingAndGlyphs'>σ</text>
-<text transform='translate(20.96,114.67) rotate(-90)' style='font-size: 7.70px; font-family: "Arial";' textLength='4.28px' lengthAdjust='spacingAndGlyphs'>n</text>
-<text transform='translate(18.97,110.39) rotate(-90)' style='font-size: 11.00px; font-family: "Symbol";' textLength='2.75px' lengthAdjust='spacingAndGlyphs'> </text>
-<text transform='translate(18.97,107.64) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='3.66px' lengthAdjust='spacingAndGlyphs'>(</text>
-<text transform='translate(18.97,103.98) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='12.25px' lengthAdjust='spacingAndGlyphs'>20</text>
-<text transform='translate(18.97,91.73) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='57.47px' lengthAdjust='spacingAndGlyphs'>-day rolling)</text>
+<text transform='translate(18.97,120.74) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='5.50px' lengthAdjust='spacingAndGlyphs'>s</text>
+<text transform='translate(20.96,115.24) rotate(-90)' style='font-size: 7.70px; font-family: "Arial";' textLength='4.28px' lengthAdjust='spacingAndGlyphs'>n</text>
+<text transform='translate(18.97,110.96) rotate(-90)' style='font-size: 11.00px; font-family: "Symbol";' textLength='2.75px' lengthAdjust='spacingAndGlyphs'> </text>
+<text transform='translate(18.97,108.21) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='3.66px' lengthAdjust='spacingAndGlyphs'>(</text>
+<text transform='translate(18.97,104.54) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='12.25px' lengthAdjust='spacingAndGlyphs'>20</text>
+<text transform='translate(18.97,92.29) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='57.47px' lengthAdjust='spacingAndGlyphs'>-day rolling)</text>
 <text x='234.71' y='20.41' text-anchor='middle' style='font-size: 13.20px; font-family: "Arial";' textLength='303.36px' lengthAdjust='spacingAndGlyphs'>Nasdaq Composite Volatility (20-day rolling window)</text>
 </g>
 <defs>
@@ -137,12 +137,12 @@
 <text x='258.99' y='291.06' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='19.56px' lengthAdjust='spacingAndGlyphs'>2022</text>
 <text x='355.82' y='291.06' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='19.56px' lengthAdjust='spacingAndGlyphs'>2024</text>
 <text x='234.71' y='303.52' text-anchor='middle' style='font-size: 11.00px; font-family: "Arial";' textLength='23.25px' lengthAdjust='spacingAndGlyphs'>Date</text>
-<text transform='translate(18.97,274.22) rotate(-90)' style='font-size: 11.00px; font-family: "Symbol";' textLength='6.64px' lengthAdjust='spacingAndGlyphs'>σ</text>
-<text transform='translate(20.96,267.59) rotate(-90)' style='font-size: 7.70px; font-family: "Arial";' textLength='4.28px' lengthAdjust='spacingAndGlyphs'>n</text>
-<text transform='translate(18.97,263.31) rotate(-90)' style='font-size: 11.00px; font-family: "Symbol";' textLength='2.75px' lengthAdjust='spacingAndGlyphs'> </text>
-<text transform='translate(18.97,260.56) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='3.66px' lengthAdjust='spacingAndGlyphs'>(</text>
-<text transform='translate(18.97,256.90) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='12.25px' lengthAdjust='spacingAndGlyphs'>20</text>
-<text transform='translate(18.97,244.65) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='57.47px' lengthAdjust='spacingAndGlyphs'>-day rolling)</text>
+<text transform='translate(18.97,273.66) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='5.50px' lengthAdjust='spacingAndGlyphs'>s</text>
+<text transform='translate(20.96,268.16) rotate(-90)' style='font-size: 7.70px; font-family: "Arial";' textLength='4.28px' lengthAdjust='spacingAndGlyphs'>n</text>
+<text transform='translate(18.97,263.88) rotate(-90)' style='font-size: 11.00px; font-family: "Symbol";' textLength='2.75px' lengthAdjust='spacingAndGlyphs'> </text>
+<text transform='translate(18.97,261.13) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='3.66px' lengthAdjust='spacingAndGlyphs'>(</text>
+<text transform='translate(18.97,257.46) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='12.25px' lengthAdjust='spacingAndGlyphs'>20</text>
+<text transform='translate(18.97,245.21) rotate(-90)' style='font-size: 11.00px; font-family: "Arial";' textLength='57.47px' lengthAdjust='spacingAndGlyphs'>-day rolling)</text>
 <text x='234.71' y='173.33' text-anchor='middle' style='font-size: 13.20px; font-family: "Arial";' textLength='303.36px' lengthAdjust='spacingAndGlyphs'>Nasdaq Composite Volatility (20-day rolling window)</text>
 </g>
 </g>
