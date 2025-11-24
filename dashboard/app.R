@@ -24,7 +24,7 @@ ui <- fluidPage(
 
       # 1. Ticker Selection
       textInput("ticker", "Ticker Symbol (Yahoo Finance):", value = "^IXIC"),
-      helpText("Examples: ^IXIC (Nasdaq), ^GSPC (S&P500), AAPL, GOOG"),
+      helpText("Examples: ^IXIC (Nasdaq), ^GSPC (S&P500), ^DJI, ^FTSE, ^HSI, ^GDAXI, ^STOXX50E"),
 
       # 2. Date Range
       dateRangeInput("date_range", "Study Period:",
@@ -56,7 +56,7 @@ ui <- fluidPage(
         tabPanel(
           "1. Data & Cleaning",
           br(),
-          h4("Price History & Log Returns"),
+          uiOutput("dynamic_title"),
           plotOutput("plot_overview", height = "600px"),
           br(),
           h4("Descriptive Statistics (Post-Cleaning)"),
@@ -75,9 +75,9 @@ ui <- fluidPage(
           tableOutput("table_ci")
         ),
 
-        # TAB 3: Stationarity
+        # TAB 3: Mean and Variance
         tabPanel(
-          "3. Stationarity (Mean & Variance)",
+          "3. Mean & Variance",
           br(),
           h4("6-Month Period Analysis"),
           p("Investigation of constant mean (Boxplots) and constant variance (Bar Chart)."),
@@ -122,13 +122,17 @@ server <- function(input, output, session) {
     withProgress(message = "Downloading Data...", {
       tryCatch(
         {
+          # 1. Download the data
           df <- getSymbols(input$ticker,
             src = "yahoo",
             from = input$date_range[1],
             to = input$date_range[2],
             auto.assign = FALSE
           )
-          return(df)
+
+          # 2. Return a LIST containing the Data AND the Symbol
+          # This "freezes" the symbol at the moment the button is clicked
+          return(list(data = df, symbol = input$ticker))
         },
         error = function(e) {
           showNotification("Error downloading ticker. Please check symbol.", type = "error")
@@ -141,34 +145,68 @@ server <- function(input, output, session) {
   # Reactive: Clean Data (Calculate z_n and remove outliers)
   clean_data <- reactive({
     req(raw_data())
-    stock <- raw_data()
 
-    # get log prices
+    # --- UNPACK DATA ---
+    # We retrieve the list we created in step 1
+    input_pack <- raw_data()
+
+    stock <- input_pack$data # The frozen XTS data
+    ticker_in <- input_pack$symbol # The frozen Ticker symbol
+    # -------------------
+
+    # 1. Define Dictionary
+    stock_lookup <- c(
+      "^IXIC" = "NASDAQ Composite",
+      "^GSPC" = "S&P 500",
+      "^DJI" = "Dow Jones Industrial Average",
+      "DIA" = "SPDR Dow Jones ETF",
+      "AAPL" = "Apple Inc.",
+      "GOOG" = "Alphabet Inc.",
+      "MSFT" = "Microsoft Corp.",
+      "^FTSE" = "FTSE 100",
+      "^N225" = "Nikkei 225 – Japanese equities",
+      "^HSI" = "Hang Seng Index – Hong Kong equities",
+      "^STOXX50E" = "EURO STOXX 50"
+    )
+
+
+    # 2. Lookup Name (Using 'ticker_in', NOT 'input$ticker')
+    if (ticker_in %in% names(stock_lookup)) {
+      stock_name <- stock_lookup[[ticker_in]]
+    } else {
+      stock_name <- tryCatch(
+        {
+          info <- getQuote(ticker_in, what = yahooQF("Name"))
+          if (is.null(info$Name) || is.na(info$Name)) {
+            return(ticker_in)
+          }
+          return(info$Name)
+        },
+        error = function(e) {
+          return(ticker_in)
+        }
+      )
+    }
+
+    # 3. Process Prices (Using 'stock')
     price_ad <- Ad(stock)
     y_n <- log(price_ad)
 
-    # handle outliers (before diffing)
     if (input$exclude_outliers) {
       out_start <- as.Date(input$outlier_start)
       out_end <- as.Date(input$outlier_end)
-
-      # Create mask on the prices
       dates <- index(y_n)
       mask <- dates >= out_start & dates <= out_end
-
-      # Set prices in the exclusion zone to NA
       y_n[mask] <- NA
     }
 
-    # Calculate returns (Diff)
-    # This will automatically turn the day after the exclusion zone into NA
     z_n <- diff(y_n)
 
-    # Return list of objects
     list(
       price = price_ad,
-      z_n_full = z_n, # Contains NAs where outliers were
-      z_n_clean = na.omit(z_n) # NAs removed completely for analysis
+      z_n_full = z_n,
+      z_n_clean = na.omit(z_n),
+      name = stock_name
     )
   })
 
@@ -185,13 +223,13 @@ server <- function(input, output, session) {
 
     # 1. Price Plot
     p1 <- ggplot(df_price, aes(date, price)) +
-      geom_line() +
+      geom_line(na.rm = TRUE) +
       theme_bw() +
       labs(title = paste(input$ticker, "- Adjusted Close"), y = "Price ($)", x = NULL)
 
     # 2. Log Return Plot
     p2 <- ggplot(df_zn, aes(date, zn)) +
-      geom_line() +
+      geom_line(na.rm = TRUE) +
       theme_bw() +
       labs(title = "Log-Return Increments (z_n)", y = expression(z[n]), x = "Date")
 
@@ -214,14 +252,28 @@ server <- function(input, output, session) {
     p1 / p2
   })
 
+  output$dynamic_title <- renderUI({
+    req(clean_data())
+    # Retrieve the name we saved earlier
+    company_name <- clean_data()$name
+
+    h4(paste0('Price History & Log Returns: "', company_name, '"'))
+  })
+
   output$table_descriptive <- renderTable(
     {
       req(clean_data())
       z <- as.numeric(clean_data()$z_n_clean)
 
       tibble(
-        Statistic = c("Mean", "Variance", "Skewness (Type 1)", "Kurtosis (Type 1)", "N"),
-        Value = c(mean(z), var(z), skewness(z, type = 1), kurtosis(z, type = 1), length(z))
+        Statistic = c("Mean", "Variance", "Skewness (Type 1)", "Excess Kurtosis (Type 1)", "N"),
+        Value = c(
+          sprintf("%.6f", mean(z)),
+          sprintf("%.6f", var(z)),
+          sprintf("%.6f", skewness(z, type = 1)),
+          sprintf("%.6f", kurtosis(z, type = 1)),
+          sprintf("%.0f", length(z))
+        )
       )
     },
     digits = 6
@@ -237,7 +289,7 @@ server <- function(input, output, session) {
     withProgress(message = "Running Bootstrap...", value = 0.5, {
       set.seed(1234)
       n_reps <- input$boot_reps
-      n_sample <- 13 # As per your script
+      n_sample <- 13
 
       # 1. Simulate Normal
       z_mean <- mean(z)
@@ -247,19 +299,28 @@ server <- function(input, output, session) {
       # 2. Bootstrap Small Sample
       skew_boot <- replicate(n_reps, skewness(sample(z, n_sample, replace = TRUE), type = 1))
 
-      # 3. Bootstrap Full Data (for BCa)
-      # BCa can be slow, so we use the boot package structure
+      # 3. Bootstrap Full Data
       skew_fun <- function(data, indices) {
         return(skewness(data[indices], type = 1))
       }
 
       boot_obj <- boot(data = z, statistic = skew_fun, R = n_reps)
-      bca_ci <- boot.ci(boot_obj, type = "bca", conf = 0.95)
+
+      # Calculate BOTH BCa and Percentile
+      # wrap in tryCatch because BCa can fail if N reps is too low
+      boot_ci_all <- tryCatch(
+        {
+          boot.ci(boot_obj, type = c("bca", "perc"), conf = 0.95)
+        },
+        error = function(e) {
+          NULL
+        }
+      )
 
       list(
         skew_normal = skew_normal,
         skew_boot = skew_boot,
-        bca_ci = bca_ci
+        boot_ci = boot_ci_all # <--- Ensure this key name matches the table below
       )
     })
   })
@@ -279,20 +340,42 @@ server <- function(input, output, session) {
       labs(title = "Sampling distributions of Skewness (n=13)", x = "Skewness")
   })
 
-  output$table_ci <- renderTable({
-    req(bootstrap_results())
-    res <- bootstrap_results()
+  output$table_ci <- renderTable(
+    {
+      req(bootstrap_results())
+      res <- bootstrap_results()
 
-    # Extract BCa
-    bca_lower <- res$bca_ci$bca[4]
-    bca_upper <- res$bca_ci$bca[5]
+      # 1. Extract Normal & Small Sample (Quantiles)
+      # unname() removes the "2.5%" labels so JSON doesn't complain
+      norm_ci <- unname(quantile(res$skew_normal, probs = c(0.025, 0.975)))
+      small_ci <- unname(quantile(res$skew_boot, probs = c(0.025, 0.975)))
 
-    tibble(
-      Method = "Bootstrap BCa (Full Data)",
-      Lower_95_CI = bca_lower,
-      Upper_95_CI = bca_upper
-    )
-  })
+      # 2. Extract Full Data (Robustly)
+      # This helper prevents crashes if boot.ci failed or is missing components
+      get_lims <- function(comp) {
+        if (is.null(comp)) {
+          return(c(NA, NA))
+        }
+        # boot.ci returns a matrix; indices 4 & 5 are the Lower/Upper bounds
+        if (is.matrix(comp)) {
+          return(comp[1, 4:5])
+        }
+        return(comp[4:5])
+      }
+
+      # Safely get limits (returns NAs if missing)
+      full_perc <- get_lims(res$boot_ci$percent)
+      full_bca <- get_lims(res$boot_ci$bca)
+
+      tibble(
+        Dataset = c("Simulated Normal (n=13)", "Bootstrap (n=13)", "Full Data", "Full Data"),
+        Method = c("Quantile (Control)", "Percentile", "Percentile", "BCa (Robust)"),
+        `Lower 95% CI` = c(norm_ci[1], small_ci[1], full_perc[1], full_bca[1]),
+        `Upper 95% CI` = c(norm_ci[2], small_ci[2], full_perc[2], full_bca[2])
+      )
+    },
+    digits = 4
+  )
 
   #----------------------------------------------------------------------------
   # ELEMENT 3 & 4: Stationarity (6-Month Blocks)
@@ -369,15 +452,56 @@ server <- function(input, output, session) {
     req(six_month_data())
     z_list <- six_month_data()
 
+    # 1. Calculate Annualized Variances for all periods
     variances <- sapply(z_list, var, na.rm = TRUE) * 252
 
+    # 2. Identify Min and Max locations
     min_loc <- which.min(variances)
     max_loc <- which.max(variances)
 
+    # 3. Extract the actual data for these periods
+    min_data <- as.numeric(na.omit(z_list[[min_loc]]))
+    max_data <- as.numeric(na.omit(z_list[[max_loc]]))
+
+    # 4. Define Boot Function (Variance * 252)
+    var_fun <- function(data, indices) {
+      var(data[indices]) * 252
+    }
+
+    # 5. Helper to calculate CI (Robust BCa with fallback)
+    get_ci <- function(data) {
+      if (length(data) < 5) {
+        return(c(NA, NA))
+      } # Safety check for tiny samples
+
+      boot_obj <- boot(data = data, statistic = var_fun, R = input$boot_reps)
+
+      tryCatch(
+        {
+          # Try BCa first (Robust)
+          boot.ci(boot_obj, type = "bca", conf = 0.95)$bca[4:5]
+        },
+        error = function(e) {
+          # Fallback to Percentile if BCa fails (common in small subsamples)
+          boot.ci(boot_obj, type = "perc", conf = 0.95)$percent[4:5]
+        }
+      )
+    }
+
+    # 6. Run Bootstrap (Wrapped in progress bar)
+    withProgress(message = "Bootstrapping Variance CIs...", value = 0.5, {
+      ci_min <- get_ci(min_data)
+      incProgress(0.3)
+      ci_max <- get_ci(max_data)
+    })
+
+    # 7. Build Table
     tibble(
       Type = c("Min Variance Period", "Max Variance Period"),
       Period = c(names(z_list)[min_loc], names(z_list)[max_loc]),
-      Annualized_Variance = c(variances[min_loc], variances[max_loc])
+      `Annualized Variance` = sprintf("%.3f", c(variances[min_loc], variances[max_loc])),
+      `Lower 95% CI` = sprintf("%.3f", c(ci_min[1], ci_max[1])),
+      `Upper 95% CI` = sprintf("%.3f", c(ci_min[2], ci_max[2]))
     )
   })
 
