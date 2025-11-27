@@ -152,7 +152,7 @@ server <- function(input, output, session) {
 
   # Reactive: Clean Data (Calculate z_n and remove outliers)
   clean_data <- reactive({
-    # We check if raw_data is available. If NULL, we return NULL too.
+    # check if raw_data is available. If NULL, we return NULL too.
     input_pack <- raw_data()
     if (is.null(input_pack)) {
       return(NULL)
@@ -161,7 +161,7 @@ server <- function(input, output, session) {
     stock <- input_pack$data
     ticker_in <- input_pack$symbol
 
-    # --- 1. Robust Dictionary (Added HSI and STOXX) ---
+    # --- 1. Index Dictionary ---
     stock_lookup <- c(
       "^IXIC" = "NASDAQ Composite",
       "^GSPC" = "S&P 500",
@@ -172,30 +172,37 @@ server <- function(input, output, session) {
       "MSFT" = "Microsoft Corp.",
       "^FTSE" = "FTSE 100",
       "STOXX50E" = "EURO STOXX 50",
-      "^STOXX50E" = "EURO STOXX 50", # adds variant
+      "^STOXX50E" = "EURO STOXX 50",
       "^GDAXI" = "DAX Performance Index",
       "^AORD" = "All Ordinaries",
       "^HSI" = "Hang Seng Index",
-      "000001.SS" = "SSE Composite"
+      "000001.SS" = "SSE Composite",
+      "^N225" = "Nikkei 225",
+      "BTC-USD" = "Bitcoin USD",
+      "TSLA" = "Tesla Inc."
     )
 
-    # --- 2. Name Fetching (Wrapped in tryCatch just in case) ---
+    # --- 2. Name Fetching (trying to fix 'return' bug) ---
     if (ticker_in %in% names(stock_lookup)) {
       stock_name <- stock_lookup[[ticker_in]]
     } else {
+      # tryCatch block now assigns the result to stock_name WITHOUT returning from the function
       stock_name <- tryCatch(
         {
           info <- getQuote(ticker_in, what = yahooQF("Name"))
+
+          # Logic checks: Just evaluate to the string, DO NOT use return()
           if (!is.data.frame(info)) {
-            return(ticker_in)
-          } # Safety check
-          if (is.null(info$Name) || is.na(info$Name)) {
-            return(ticker_in)
+            ticker_in
+          } else if (is.null(info$Name) || is.na(info$Name)) {
+            ticker_in
+          } else {
+            info$Name
           }
-          return(info$Name)
         },
         error = function(e) {
-          return(ticker_in)
+          # On error, just evaluate to the ticker string
+          ticker_in
         }
       )
     }
@@ -214,6 +221,7 @@ server <- function(input, output, session) {
 
     z_n <- diff(y_n)
 
+    # Now this list will always be created, even if getQuote failed
     list(
       price = price_ad,
       z_n_full = z_n,
@@ -330,7 +338,7 @@ server <- function(input, output, session) {
       list(
         skew_normal = skew_normal,
         skew_boot = skew_boot,
-        boot_ci = boot_ci_all # <--- Ensure this key name matches the table below
+        boot_ci = boot_ci_all
       )
     })
   })
