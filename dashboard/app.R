@@ -1,7 +1,7 @@
 # Load necessary libraries
 library(shiny)
-library(quantmod)
 library(tidyverse)
+library(quantmod)
 library(e1071)
 library(boot)
 library(patchwork)
@@ -24,7 +24,7 @@ ui <- fluidPage(
 
       # 1. Ticker Selection
       textInput("ticker", "Ticker Symbol (Yahoo Finance):", value = "^IXIC"),
-      helpText("Examples: ^IXIC (Nasdaq), ^GSPC (S&P500), ^DJI, ^FTSE, ^HSI, ^GDAXI, ^STOXX50E"),
+      helpText("Examples: ^IXIC (Nasdaq), ^GSPC (S&P500), ^DJI, ^FTSE, ^HSI, ^GDAXI, ^STOXX50E, ^AORD"),
 
       # 2. Date Range
       dateRangeInput("date_range", "Study Period:",
@@ -122,20 +122,28 @@ server <- function(input, output, session) {
     withProgress(message = "Downloading Data...", {
       tryCatch(
         {
-          # 1. Download the data
-          df <- getSymbols(input$ticker,
-            src = "yahoo",
-            from = input$date_range[1],
-            to = input$date_range[2],
-            auto.assign = FALSE
+          # 1. Download
+          df <- suppressWarnings(
+            getSymbols(input$ticker,
+              src = "yahoo",
+              from = input$date_range[1],
+              to = input$date_range[2],
+              auto.assign = FALSE
+            )
           )
 
-          # 2. Return a LIST containing the Data AND the Symbol
-          # This "freezes" the symbol at the moment the button is clicked
+          # 2. Clean
+          df <- na.omit(df)
+
+          # 3. CHECK: Did we lose all data? (e.g. if ticker exists but has no data)
+          if (nrow(df) == 0) {
+            return(NULL)
+          }
+
           return(list(data = df, symbol = input$ticker))
         },
         error = function(e) {
-          showNotification("Error downloading ticker. Please check symbol.", type = "error")
+          # Return NULL so we can handle it gracefully in the UI
           return(NULL)
         }
       )
@@ -144,17 +152,16 @@ server <- function(input, output, session) {
 
   # Reactive: Clean Data (Calculate z_n and remove outliers)
   clean_data <- reactive({
-    req(raw_data())
-
-    # --- UNPACK DATA ---
-    # We retrieve the list we created in step 1
+    # We check if raw_data is available. If NULL, we return NULL too.
     input_pack <- raw_data()
+    if (is.null(input_pack)) {
+      return(NULL)
+    }
 
-    stock <- input_pack$data # The frozen XTS data
-    ticker_in <- input_pack$symbol # The frozen Ticker symbol
-    # -------------------
+    stock <- input_pack$data
+    ticker_in <- input_pack$symbol
 
-    # 1. Define Dictionary
+    # --- 1. Robust Dictionary (Added HSI and STOXX) ---
     stock_lookup <- c(
       "^IXIC" = "NASDAQ Composite",
       "^GSPC" = "S&P 500",
@@ -164,19 +171,24 @@ server <- function(input, output, session) {
       "GOOG" = "Alphabet Inc.",
       "MSFT" = "Microsoft Corp.",
       "^FTSE" = "FTSE 100",
-      "^N225" = "Nikkei 225 – Japanese equities",
-      "^HSI" = "Hang Seng Index – Hong Kong equities",
-      "^STOXX50E" = "EURO STOXX 50"
+      "STOXX50E" = "EURO STOXX 50",
+      "^STOXX50E" = "EURO STOXX 50", # adds variant
+      "^GDAXI" = "DAX Performance Index",
+      "^AORD" = "All Ordinaries",
+      "^HSI" = "Hang Seng Index",
+      "000001.SS" = "SSE Composite"
     )
 
-
-    # 2. Lookup Name (Using 'ticker_in', NOT 'input$ticker')
+    # --- 2. Name Fetching (Wrapped in tryCatch just in case) ---
     if (ticker_in %in% names(stock_lookup)) {
       stock_name <- stock_lookup[[ticker_in]]
     } else {
       stock_name <- tryCatch(
         {
           info <- getQuote(ticker_in, what = yahooQF("Name"))
+          if (!is.data.frame(info)) {
+            return(ticker_in)
+          } # Safety check
           if (is.null(info$Name) || is.na(info$Name)) {
             return(ticker_in)
           }
@@ -188,7 +200,7 @@ server <- function(input, output, session) {
       )
     }
 
-    # 3. Process Prices (Using 'stock')
+    # 3. Process Data
     price_ad <- Ad(stock)
     y_n <- log(price_ad)
 
@@ -214,26 +226,28 @@ server <- function(input, output, session) {
   # ELEMENT 1: Overview Plots & Descriptives
   #----------------------------------------------------------------------------
   output$plot_overview <- renderPlot({
-    req(clean_data())
-    data <- clean_data()
+    # --- THE VALIDATION BLOCK ---
+    # If clean_data() is NULL, this stops execution and shows the message
+    validate(
+      need(clean_data(), "Index not yet supported or data unavailable for this range.")
+    )
+    # ----------------------------
 
-    # Create DataFrames for ggplot
+    data <- clean_data()
+    # ... rest of your code ...
     df_price <- data.frame(date = index(data$price), price = as.numeric(data$price))
     df_zn <- data.frame(date = index(data$z_n_full), zn = as.numeric(data$z_n_full))
 
-    # 1. Price Plot
     p1 <- ggplot(df_price, aes(date, price)) +
       geom_line(na.rm = TRUE) +
       theme_bw() +
-      labs(title = paste(input$ticker, "- Adjusted Close"), y = "Price ($)", x = NULL)
+      labs(title = paste(data$name, "- Adjusted Close"), y = "Price ($)", x = NULL)
 
-    # 2. Log Return Plot
     p2 <- ggplot(df_zn, aes(date, zn)) +
       geom_line(na.rm = TRUE) +
       theme_bw() +
       labs(title = "Log-Return Increments (z_n)", y = expression(z[n]), x = "Date")
 
-    # Highlight outlier region if selected
     if (input$exclude_outliers) {
       rect <- data.frame(
         xmin = input$outlier_start, xmax = input$outlier_end,
@@ -248,36 +262,32 @@ server <- function(input, output, session) {
         fill = "red", alpha = 0.2, inherit.aes = FALSE
       )
     }
-
     p1 / p2
   })
 
   output$dynamic_title <- renderUI({
-    req(clean_data())
-    # Retrieve the name we saved earlier
-    company_name <- clean_data()$name
+    # No validation needed - return nothing if data missing
+    if (is.null(clean_data())) {
+      return(NULL)
+    }
 
+    company_name <- clean_data()$name
     h4(paste0('Price History & Log Returns: "', company_name, '"'))
   })
 
-  output$table_descriptive <- renderTable(
-    {
-      req(clean_data())
-      z <- as.numeric(clean_data()$z_n_clean)
+  output$table_descriptive <- renderTable({
+    validate(need(clean_data(), "Data unavailable."))
 
-      tibble(
-        Statistic = c("Mean", "Variance", "Skewness (Type 1)", "Excess Kurtosis (Type 1)", "N"),
-        Value = c(
-          sprintf("%.6f", mean(z)),
-          sprintf("%.6f", var(z)),
-          sprintf("%.6f", skewness(z, type = 1)),
-          sprintf("%.6f", kurtosis(z, type = 1)),
-          sprintf("%.0f", length(z))
-        )
+    z <- as.numeric(clean_data()$z_n_clean)
+    tibble(
+      Statistic = c("Mean", "Variance", "Skewness (Type 1)", "Excess Kurtosis (Type 1)", "N"),
+      Value = c(
+        sprintf("%.6f", mean(z)), sprintf("%.6f", var(z)),
+        sprintf("%.6f", skewness(z, type = 1)), sprintf("%.6f", kurtosis(z, type = 1)),
+        sprintf("%.0f", length(z))
       )
-    },
-    digits = 6
-  )
+    )
+  })
 
   #----------------------------------------------------------------------------
   # ELEMENT 2: Bootstrapping
@@ -326,14 +336,18 @@ server <- function(input, output, session) {
   })
 
   output$plot_bootstrap <- renderPlot({
+    validate(need(clean_data(), "Data unavailable for bootstrapping."))
     req(bootstrap_results())
+
     res <- bootstrap_results()
 
+    # 2. Prepare Data
     df <- data.frame(
       skewness = c(res$skew_normal, res$skew_boot),
       Source = factor(rep(c("Normal Model (n=13)", "Bootstrap from Data (n=13)"), each = input$boot_reps))
     )
 
+    # 3. Plot
     ggplot(df, aes(x = skewness, fill = Source)) +
       geom_density(alpha = 0.4) +
       theme_bw() +
@@ -342,6 +356,7 @@ server <- function(input, output, session) {
 
   output$table_ci <- renderTable(
     {
+      validate(need(clean_data(), "Data unavailable."))
       req(bootstrap_results())
       res <- bootstrap_results()
 
@@ -415,6 +430,7 @@ server <- function(input, output, session) {
   })
 
   output$plot_stationarity <- renderPlot({
+    validate(need(clean_data(), "Data unavailable for stationarity analysis."))
     req(six_month_data())
     z_list <- six_month_data()
 
@@ -449,6 +465,7 @@ server <- function(input, output, session) {
   })
 
   output$table_variance_comp <- renderTable({
+    validate(need(clean_data(), "Data unavailable."))
     req(six_month_data())
     z_list <- six_month_data()
 
@@ -530,6 +547,8 @@ server <- function(input, output, session) {
 
   output$table_contingency <- renderTable(
     {
+      validate(need(clean_data(), "Data unavailable."))
+      req(independence_data())
       dat <- independence_data()
       tbl <- table(dat$cat_prev, dat$cat_n)
       as.data.frame.matrix(tbl, row.names = paste("Prev", rownames(tbl)))
